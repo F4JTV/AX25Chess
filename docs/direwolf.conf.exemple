@@ -1,0 +1,36 @@
+#############################################################################
+# Exemple minimal de direwolf.conf pour AX25Chess
+#
+# Lancement :  direwolf -t 0 -c direwolf.conf
+#############################################################################
+
+# --- carte son -------------------------------------------------------------
+# Listez vos peripheriques avec : direwolf -p  ou  arecord -l
+ADEVICE  plughw:1,0
+
+# --- canal 0 ---------------------------------------------------------------
+CHANNEL  0
+MYCALL   F4JTV-7
+MODEM    1200
+
+# --- commande d'emission ---------------------------------------------------
+# Choisissez UNE des lignes suivantes selon votre interface.
+#PTT     /dev/ttyUSB0 RTS
+#PTT     GPIO 25
+PTT      RIG 2 localhost:4532        # via rigctld (Hamlib)
+
+# Marges d'emission : a allonger si votre TX est lent a monter en puissance
+TXDELAY  30
+TXTAIL   10
+DWAIT    0
+SLOTTIME 10
+PERSIST  63
+
+# --- interface KISS utilisee par AX25Chess ---------------------------------
+# Ligne indispensable : c'est par ce port que l'application dialogue.
+# Si vous laissez AX25Chess lancer Direwolf, indiquez le chemin de ce fichier
+# dans l'onglet RADIO, champ « Configuration ».
+KISSPORT 8001
+
+# --- pas de balise ni de digipeat : liaison point a point ------------------
+# (aucune ligne PBEACON / DIGIPEAT n'est necessaire)

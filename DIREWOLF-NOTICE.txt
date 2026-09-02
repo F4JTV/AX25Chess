@@ -1,0 +1,59 @@
+DIREWOLF - LICENCE ET CODE SOURCE
+=================================
+
+Cette installation comprend Dire Wolf, un modem logiciel (TNC) ecrit par
+John Langner, WB2OSZ.
+
+    Dire Wolf - an amateur radio soundcard TNC
+    Copyright (C) 2011-2025 John Langner, WB2OSZ
+    https://github.com/wb2osz/direwolf
+    Sous licence GNU General Public License, version 2.
+
+Dire Wolf est un programme distinct d'AX25Chess. Il est inclus ici pour la
+seule commodite de l'operateur, afin qu'une station fonctionnelle puisse
+etre montee en une seule etape. Il n'est modifie en aucune facon, et il peut
+etre telecharge, installe, mis a jour ou supprime independamment
+d'AX25Chess.
+
+Les deux programmes communiquent par une socket TCP KISS, chacun dans son
+propre processus. AX25Chess ne contient aucun code de Dire Wolf : sa couche
+AX.25 est ecrite d'apres la specification AX.25 2.2 publique.
+
+
+OFFRE ECRITE POUR LE CODE SOURCE
+--------------------------------
+
+L'article 3 de la GNU General Public License version 2 exige que quiconque
+distribue ce programme sous forme binaire fournisse egalement le code source
+correspondant, ou une offre ecrite de le fournir.
+
+Le code source complet de la version de Dire Wolf incluse ici est disponible
+sur la page des versions du projet :
+
+    https://github.com/wb2osz/direwolf/releases
+
+Cherchez l'archive des sources portant le meme numero de version que le
+binaire installe. Ce numero s'affiche en lancant direwolf.exe, et dans
+l'onglet DIREWOLF d'AX25Chess au demarrage.
+
+Celui qui vous a remis ce paquet est en outre tenu de fournir ces sources
+sur demande, sur un support physique si vous le demandez, pour un prix
+n'excedant pas le cout du support, pendant trois ans a compter de la date de
+distribution. Si vous avez recu ce paquet d'un tiers plutot que du projet
+Dire Wolf, adressez-lui cette demande.
+
+
+SI VOUS REDISTRIBUEZ CE PAQUET
+------------------------------
+
+Renvoyer vers une adresse amont est ce que font la plupart des projets, et
+c'est ce que fait la presente notice. Il vaut cependant la peine de
+comprendre que l'article 3(b) reclame une offre emanant de VOUS, le
+distributeur, et pas seulement un lien vers le serveur de quelqu'un d'autre.
+L'article 3(c) ne permet de relayer l'offre d'un tiers que pour une
+distribution non commerciale d'un binaire recu avec une telle offre.
+
+La solution la plus sure, et elle ne coute presque rien, consiste a deposer
+l'archive des sources de Dire Wolf de la version correspondante a cote de
+votre installateur au moment de le publier, et a la garder disponible aussi
+longtemps que l'installateur l'est.
