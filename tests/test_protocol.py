@@ -73,8 +73,8 @@ def main() -> int:
 
     # --- 1. mat du berger sur canal propre --------------------------------
     la, lb = LoopbackListener(7), LoopbackListener(8)
-    a = GameSession("F4JTV", "F1ABC", la, rng=random.Random(1))
-    b = GameSession("F1ABC", "F4JTV", lb, rng=random.Random(2))
+    a = GameSession("N0CALL", "N0CALL-2", la, rng=random.Random(1))
+    b = GameSession("N0CALL-2", "N0CALL", lb, rng=random.Random(2))
     la.peer, lb.peer = b, a
     a.invite(now=NOW[0])
 
@@ -98,8 +98,8 @@ def main() -> int:
 
     # --- 2. ouverture espagnole avec 35 % de pertes ------------------------
     la, lb = LoopbackListener(11), LoopbackListener(12)
-    a = GameSession("F4JTV", "F1ABC", la, rng=random.Random(11))
-    b = GameSession("F1ABC", "F4JTV", lb, rng=random.Random(12))
+    a = GameSession("N0CALL", "N0CALL-2", la, rng=random.Random(11))
+    b = GameSession("N0CALL-2", "N0CALL", lb, rng=random.Random(12))
     la.peer, lb.peer = b, a
     a.invite(now=NOW[0])
     la.loss = lb.loss = 0.35

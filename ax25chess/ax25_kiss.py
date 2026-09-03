@@ -37,7 +37,7 @@ class AX25Error(Exception):
 # --------------------------------------------------------------------------
 
 def split_callsign(text: str) -> tuple[str, int]:
-    """'F4JTV-7' -> ('F4JTV', 7)"""
+    """'N0CALL-7' -> ('N0CALL', 7)"""
     text = text.strip().upper()
     if "-" in text:
         base, ssid = text.split("-", 1)

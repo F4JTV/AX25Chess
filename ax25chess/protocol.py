@@ -22,8 +22,8 @@ Charge utile d'un coup (le coeur du sujet)
 
     MOVE|<UID>;<case_depart>;<case_arrivee>;<promo>;<ply>;<empreinte>
 
-    exemple :  CHS1|3F1A|F4JTV|F1ABC|7|MOVE|WP5;13;29;-;0;A34F|1C09
-               -> l'operateur F4JTV deplace la piece WP5 (pion e2)
+    exemple :  CHS1|3F1A|N0CALL|N0CALL-2|7|MOVE|WP5;13;29;-;0;A34F|725A
+               -> l'operateur N0CALL deplace la piece WP5 (pion e2)
                   de la case 13 vers la case 29 (e2-e4), demi-coup 0,
                   empreinte de la position resultante A34F
 

@@ -36,6 +36,11 @@ from .net_link import KissLink
 from .protocol import (GameSession, SessionListener, position_hash)
 
 APP_NAME = "AX25Chess"
+
+# Espace de stockage des reglages. Neutre a dessein : dans un projet publie,
+# tous les utilisateurs ecriraient sinon sous le nom de l'auteur.
+SETTINGS_ORG = "AX25Chess"
+
 STATE_DIR = STORE_DIR
 
 def build_style() -> str:
@@ -120,7 +125,7 @@ class MainWindow(QMainWindow, SessionListener):
         self.resize(1240, 800)
         # « monospace » ne se resout que via fontconfig, absent sous Windows :
         # on injecte une famille reellement installee.
-        self.settings = QSettings("F4JTV", APP_NAME)
+        self.settings = QSettings(SETTINGS_ORG, APP_NAME)
         self.link = KissLink(self)
         self.direwolf = DirewolfProcess(self)
         self.store = GameStore()
@@ -407,7 +412,7 @@ class MainWindow(QMainWindow, SessionListener):
 
         box2 = QGroupBox(tr("Station"))
         f2 = QFormLayout(box2)
-        self.ed_call = QLineEdit("F4JTV")
+        self.ed_call = QLineEdit("N0CALL")
         self.ed_peer = QLineEdit("")
         self.ed_path = QLineEdit("")
         self.ed_path.setPlaceholderText(tr("relais separes par une virgule, ex. WIDE1-1"))
@@ -532,7 +537,7 @@ class MainWindow(QMainWindow, SessionListener):
         s = self.settings
         self.ed_host.setText(s.value("host", "127.0.0.1"))
         self.sp_port.setValue(int(s.value("port", 8001)))
-        self.ed_call.setText(s.value("call", "F4JTV"))
+        self.ed_call.setText(s.value("call", "N0CALL"))
         self.ed_peer.setText(s.value("peer", ""))
         self.ed_path.setText(s.value("path", ""))
         self.sp_retry.setValue(int(s.value("retry", 14)))
@@ -986,17 +991,38 @@ class MainWindow(QMainWindow, SessionListener):
             self.tabs.setTabText(3, tr("MESSAGES *"))
 
     def on_game_over(self, code: str, text: str) -> None:
+        # Le rangement se fait tout de suite, l'annonce est differee : voyez
+        # _show_later.
         self.log("info", tr("Fin de partie : {text}", text=text))
-        QMessageBox.information(self, APP_NAME, text)
         if self.session:
             self.store.delete(self.session.gid, self.session.peer_call)
         self._refresh_games_button()
+        self._show_later(
+            lambda: QMessageBox.information(self, APP_NAME, text))
 
     def on_draw_offer(self) -> None:
-        r = QMessageBox.question(self, APP_NAME,
-                                 tr("Votre correspondant propose la nulle. Acceptez-vous ?"))
-        self.session.answer_draw(r == QMessageBox.StandardButton.Yes,
+        self._show_later(self._ask_draw)
+
+    def _ask_draw(self) -> None:
+        if not self.session or not self.session.draw_offered_by_peer:
+            return
+        answer = QMessageBox.question(
+            self, APP_NAME,
+            tr("Votre correspondant propose la nulle. Acceptez-vous ?"))
+        self.session.answer_draw(answer == QMessageBox.StandardButton.Yes,
                                  now=time.monotonic())
+
+    @staticmethod
+    def _show_later(callback) -> None:
+        """Affiche une boite de dialogue apres le rappel reseau en cours.
+
+        Ces rappels arrivent depuis feed(), lui-meme appele par le lecteur de
+        socket. Une boite modale y fait tourner une boucle d'evenements : des
+        trames peuvent arriver et rentrer une seconde fois dans feed() pendant
+        que la question est affichee, sur un etat a demi modifie. Le delai de
+        zero milliseconde suffit a rendre la main avant d'ouvrir la fenetre.
+        """
+        QTimer.singleShot(0, callback)
 
     # ------------------------------------------------------------ affichage
 

@@ -82,7 +82,7 @@ def main() -> int:
     # Sans cela, fermer la fenetre mesuree terminerait la boucle d'evenements
     # et les phases suivantes ne s'executeraient jamais.
     app.setQuitOnLastWindowClosed(False)
-    QSettings("F4JTV", "AX25Chess").clear()
+    QSettings("AX25Chess", "AX25Chess").clear()
     exe = make_fake(sandbox)
 
     from ax25chess.main_window import MainWindow

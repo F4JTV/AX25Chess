@@ -52,14 +52,14 @@ def make_fake() -> str:
 
 
 def configure(exe: str, launch: bool) -> None:
-    s = QSettings("F4JTV", "AX25Chess")
-    s.clear()
+    QSettings("AX25Chess", "AX25Chess").clear()
+    s = QSettings("AX25Chess", "AX25Chess")
     s.setValue("dw_exe", exe)
     s.setValue("dw_launch", launch)
     s.setValue("autoconnect", True)
     s.setValue("port", FAKE_PORT)
-    s.setValue("call", "F4JTV")
-    s.setValue("peer", "F1ABC")
+    s.setValue("call", "N0CALL")
+    s.setValue("peer", "N0CALL-2")
     s.sync()
 
 

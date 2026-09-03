@@ -419,13 +419,19 @@ CATALOG: dict[str, dict[str, str]] = {
 # API
 # --------------------------------------------------------------------------
 
-def tr(text: str, **fields) -> str:
-    """Traduit `text` dans la langue courante et y insere `fields`.
+def tr(source: str, /, **fields) -> str:
+    """Traduit `source` dans la langue courante et y insere `fields`.
+
+    Le premier parametre est positionnel UNIQUEMENT, d'ou la barre oblique.
+    Sans elle, un champ portant le meme nom que lui — et le catalogue emploie
+    bien un champ « text » — provoquerait un TypeError au moment precis ou la
+    chaine doit s'afficher, c'est-a-dire en pleine partie. La barre oblique
+    reserve tous les noms de champs a l'operateur.
 
     Une chaine sans traduction est rendue telle quelle : l'interface reste
     lisible pendant qu'une traduction manque, au lieu d'afficher un vide.
     """
-    out = CATALOG.get(_current, {}).get(text, text)
+    out = CATALOG.get(_current, {}).get(source, source)
     if fields:
         try:
             out = out.format(**fields)
@@ -433,7 +439,7 @@ def tr(text: str, **fields) -> str:
             # Traduction mal formee : on retombe sur la source plutot que de
             # faire echouer l'affichage.
             try:
-                out = text.format(**fields)
+                out = source.format(**fields)
             except Exception:
                 pass
     return out

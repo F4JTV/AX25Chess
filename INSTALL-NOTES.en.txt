@@ -1,0 +1,77 @@
+AX25CHESS - READ BEFORE INSTALLING
+==================================
+
+
+WHAT YOU ARE INSTALLING
+
+AX25Chess is the game and the AX.25 protocol layer. Direwolf is the software
+modem that turns frames into audio and keys your transceiver. Without both,
+there is no station.
+
+If this installer offers a Direwolf component, tick it, unless you already
+have Direwolf installed and configured.
+
+Direwolf goes into its own folder NEXT TO AX25Chess, not inside it, so that
+it stays a program in its own right, usable alone or with other software.
+The installer proposes a location, lets you change it, and warns you before
+overwriting an existing Direwolf installation.
+
+On first run AX25Chess finds it and writes a starter direwolf.conf into your
+own settings folder, which is writable wherever you installed.
+
+If there is no Direwolf component, install it separately from:
+
+    https://github.com/wb2osz/direwolf/releases
+
+
+BEFORE YOU START
+
+1. Edit direwolf.conf for your station. The "Create" button in the RADIO tab
+   writes a starter file and tells you where it is. At a minimum it needs an
+   audio device, your callsign, a modem speed and a KISS port:
+
+       ADEVICE  0
+       CHANNEL  0
+       MYCALL   N0CALL-7
+       MODEM    1200
+       PTT      COM3 RTS
+       KISSPORT 8001
+
+   List your audio devices with:  direwolf -p
+
+2. Set your callsign and your peer's in the RADIO tab. Your callsign travels
+   in every transmitted frame.
+
+3. The KISS port in the application and the KISSPORT line in direwolf.conf
+   must carry the same number. That is the first thing to check if the link
+   does not come up.
+
+
+THE DIREWOLF CONSOLE ON WINDOWS
+
+The DIREWOLF tab is often empty on Windows, and that is expected: the system
+switches Direwolf's output to block buffering as soon as it is captured, and
+lines only arrive in 4 KB chunks. This does not stop the link from working;
+readiness comes from probing the KISS port, not from reading the console.
+
+To see the real console, leave "Separate Direwolf console window" ticked in
+the RADIO tab. Direwolf then opens in its own window.
+
+
+SMARTSCREEN WARNING
+
+This installer is not digitally signed. Windows SmartScreen will warn you on
+first launch. Click "More info" then "Run anyway".
+
+
+UNINSTALLING
+
+Removing AX25Chess asks whether Direwolf should be removed as well. Answer No
+to keep it: it stays complete and usable, since it is a separate program.
+
+
+LICENCES
+
+AX25Chess is under GPL-2.0; see LICENSE.txt. Direwolf is a separate program,
+also under GPL-2.0; if you install the Direwolf component, read
+DIREWOLF-NOTICE.txt, especially if you intend to redistribute this package.

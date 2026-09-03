@@ -106,7 +106,7 @@ def main() -> int:
     from PyQt6.QtWidgets import QApplication
     app = QApplication.instance() or QApplication([])
     app.setQuitOnLastWindowClosed(False)
-    QSettings("F4JTV", "AX25Chess").clear()
+    QSettings("AX25Chess", "AX25Chess").clear()
 
     from ax25chess.main_window import MainWindow
     win = MainWindow()

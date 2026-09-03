@@ -80,6 +80,33 @@ def main() -> int:
     check("aucune traduction vide",
           all(value.strip() for value in catalog.values()))
 
+    # Chaque entree est REELLEMENT appelee, avec ses vrais noms de champs et
+    # dans les deux langues. Un controle statique des accolades ne suffit
+    # pas : c'est ainsi qu'un champ nomme « text », entrant en collision avec
+    # le parametre de tr(), a pu lever un TypeError en pleine partie.
+    failures = []
+    for language in ("fr", "en"):
+        i18n.set_language(language)
+        for source in sorted(catalog):
+            values = {name: f"<{name}>" for name in fields(source)}
+            try:
+                rendered = i18n.tr(source, **values)
+            except Exception as exc:
+                failures.append(f"{language} {source!r} -> {type(exc).__name__}: {exc}")
+                continue
+            missing = [name for name in values if f"<{name}>" not in rendered]
+            if missing:
+                failures.append(f"{language} {source!r} -> champs non substitues "
+                                f"{missing}")
+    check(f"chaque entree du catalogue s'affiche sans erreur "
+          f"({len(catalog)} x 2 appels)", not failures)
+    for line in failures[:8]:
+        print("      ", line)
+
+    check("le premier parametre de tr() est positionnel uniquement",
+          "def tr(source: str, /," in
+          (ROOT / "ax25chess" / "i18n.py").read_text(encoding="utf-8"))
+
     # Comportement du moteur
     i18n.set_language("fr")
     check("langue francaise par defaut", i18n.current_language() == "fr")
@@ -105,8 +132,8 @@ def main() -> int:
     from PyQt6.QtWidgets import QApplication
     app = QApplication.instance() or QApplication([])
     app.setQuitOnLastWindowClosed(False)
-    settings = QSettings("F4JTV", "AX25Chess")
-    settings.clear()
+    QSettings("AX25Chess", "AX25Chess").clear()
+    settings = QSettings("AX25Chess", "AX25Chess")
     settings.setValue("language", "fr")
     settings.sync()
 

@@ -108,6 +108,38 @@ def installer_tests() -> None:
     check("sections toutes connues", not set(sections) - known)
     check("[Setup] declare une seule fois", sections.count("Setup") == 1)
 
+    # Inno Setup lit toute ligne dont le premier caractere non blanc est un
+    # crochet comme un en-tete de section, y compris au milieu d'un bloc
+    # Pascal. Une continuation d'appel commencant par un tableau d'arguments
+    # a ainsi produit un « Invalid section tag » en pleine section [Code].
+    headers = {i for i, line in enumerate(text.split("\n"))
+               if line.startswith("[") and line.rstrip().endswith("]")}
+    stray = [(i + 1, line.strip()) for i, line in enumerate(text.split("\n"))
+             if line.strip().startswith("[") and i not in headers]
+    check("aucune ligne ne commence par un crochet hors en-tete de section",
+          not stray)
+    for number, line in stray[:5]:
+        print(f"      ligne {number} : {line[:60]}")
+
+    # Un commentaire Pascal { ... } se termine au premier } rencontre : y
+    # ecrire une constante {code:...} ou {app} le referme trop tot et le
+    # reste du commentaire devient du code.
+    code_block = text[text.index("[Code]"):]
+    depth_issue = re.findall(r"\{[^{}]*\{[^{}]*\}[^{}]*\}", code_block)
+    check("aucun commentaire Pascal contenant une constante entre accolades",
+          not depth_issue)
+    for bad in depth_issue[:3]:
+        print("      ", bad[:70].replace("\n", " "))
+
+    # Meme piege pour la forme parenthesee : un delimiteur cite dans la prose
+    # referme le commentaire au milieu.
+    nested_paren = [c for c in re.findall(r"\(\*.*?\*\)", code_block, re.S)
+                    if "(*" in c[2:]]
+    check("aucun commentaire parenthese contenant un delimiteur",
+          not nested_paren)
+    for bad in nested_paren[:3]:
+        print("      ", bad[:70].replace("\n", " "))
+
     n_if = len(re.findall(r"^\s*#if\b", text, re.M))
     n_end = len(re.findall(r"^\s*#endif\b", text, re.M))
     check(f"directives #if/#endif equilibrees ({n_if})", n_if == n_end and n_if > 0)
@@ -152,8 +184,23 @@ def installer_tests() -> None:
         check(f"{label} : composant direwolf coherent",
               ("direwolf" in declared_components) == has_direwolf)
 
-    check("Direwolf installe hors de _internal",
-          r'DestDir: "{app}\direwolf"' in text)
+    # Direwolf est un programme a part entiere : dossier voisin, jamais sous
+    # {app}, et surtout jamais dans _internal que [InstallDelete] efface a
+    # chaque mise a jour.
+    check("Direwolf installe dans un dossier voisin",
+          'DestDir: "{code:GetDirewolfDir}"' in text)
+    check("plus aucune installation sous {app}",
+          r'DestDir: "{app}\direwolf"' not in text)
+    check("emplacement choisi par l'operateur",
+          "CreateInputDirPage" in text and "GetDirewolfDir" in text)
+    check("ecrasement d'un Direwolf existant signale",
+          "DirewolfExists" in text and "NextButtonClick" in text)
+    check("page masquee si le composant n'est pas retenu",
+          "ShouldSkipPage" in text and "WizardIsComponentSelected" in text)
+    check("emplacement memorise dans le registre",
+          "DirewolfDir" in section(text, "Registry"))
+    check("desinstallateur relit l'emplacement",
+          "RegQueryStringValue" in text)
     check("_internal efface a la mise a jour",
           r'Name: "{app}\_internal"' in text)
     check("_internal seul dans [InstallDelete]",
@@ -162,11 +209,70 @@ def installer_tests() -> None:
     check("notice GPL non optionnelle pour le binaire",
           "DIREWOLF-NOTICE.txt" in text)
 
-    code = text[text.index("[Code]"):]
-    check("bloc [Code] equilibre",
-          len(re.findall(r"\bbegin\b", code)) == len(re.findall(r"\bend[;.]", code)))
+    # --- bilinguisme de l'installateur --------------------------------
+    languages = section(text, "Languages")
+    declared_languages = set(re.findall(r'^Name:\s*"(\w+)"', languages, re.M))
+    check("installateur bilingue anglais/francais",
+          {"english", "french"} <= declared_languages)
+    check("langue detectee depuis l'interface Windows",
+          "LanguageDetectionMethod=uilanguage" in text)
+    check("boite de choix seulement si la detection echoue",
+          "ShowLanguageDialog=auto" in text)
+    check("notes d'installation declarees par langue",
+          text.count("InfoBeforeFile:") == len(declared_languages))
+    check("aucun InfoBeforeFile global residuel",
+          "InfoBeforeFile=" not in text)
 
-    for name in ("LICENSE.txt", "INSTALL-NOTES.txt", "DIREWOLF-NOTICE.txt",
+    messages = section(text, "CustomMessages")
+    defined = {}
+    for line in messages.splitlines():
+        match = re.match(r"^(\w+)\.(\w+)=", line.strip())
+        if match:
+            defined.setdefault(match.group(2), set()).add(match.group(1))
+    # Deux formes coexistent : {cm:Nom} dans les sections, et
+    # CustomMessage('Nom') dans le code Pascal. Ne regarder que la premiere
+    # ferait passer tous les messages du desinstallateur pour orphelins.
+    used = set(re.findall(r"\{cm:(\w+)", text))
+    used |= set(re.findall(r"CustomMessage\(\s*'(\w+)'\s*\)", text))
+    # LaunchProgram, CreateDesktopIcon et UninstallProgram viennent des
+    # fichiers de messages fournis par Inno Setup, pas de ce script.
+    builtin = {"LaunchProgram", "CreateDesktopIcon", "AdditionalIcons",
+               "UninstallProgram"}
+    custom_used = used - builtin
+    check("tout message personnalise employe est defini",
+          not (custom_used - set(defined)))
+    incomplete = sorted(name for name in custom_used
+                        if defined.get(name, set()) != declared_languages)
+    check("chaque message personnalise existe dans les deux langues",
+          not incomplete)
+    for name in incomplete[:5]:
+        print("      incomplet :", name, sorted(defined.get(name, [])))
+
+    orphan = sorted(set(defined) - custom_used)
+    check("aucun message personnalise inutilise", not orphan)
+    for name in orphan[:5]:
+        print("      orphelin :", name)
+
+    # --- desinstallation de Direwolf ----------------------------------
+    check("Direwolf survit a la desinstallation ordinaire",
+          "uninsneveruninstall" in text)
+    check("le sort de Direwolf est decide par une question",
+          "CurUninstallStepChanged" in text and "RemoveDirewolf" in text)
+    check("suppression recursive du dossier Direwolf",
+          "DelTree" in text)
+    check("aucun effacement automatique du dossier Direwolf",
+          "direwolf" not in section(text, "UninstallDelete").lower())
+
+    # Les commentaires Pascal sont retires avant le comptage, et l'on
+    # compte « end » et non « end; » : celui qui precede un else n'a pas de
+    # point-virgule, et l'ancienne version signalait a tort un desequilibre.
+    code = re.sub(r"\{[^}]*\}", " ", text[text.index("[Code]"):])
+    begins = len(re.findall(r"\bbegin\b", code))
+    ends = len(re.findall(r"\bend\b", code))
+    check(f"bloc [Code] equilibre (begin={begins}, end={ends})", begins == ends)
+
+    for name in ("LICENSE.txt", "INSTALL-NOTES.en.txt", "INSTALL-NOTES.fr.txt",
+                 "DIREWOLF-NOTICE.txt",
                  "version.iss", "assets/ax25chess.ico"):
         check(f"fichier requis present : {name}", (ROOT / name).exists())
 
@@ -374,7 +480,7 @@ def portability_tests() -> None:
     from PyQt6.QtCore import QSettings
     from PyQt6.QtWidgets import QApplication
     app = QApplication.instance() or QApplication([])
-    QSettings("F4JTV", "AX25Chess").clear()
+    QSettings("AX25Chess", "AX25Chess").clear()
     from ax25chess.board_widget import SOLID, mono_family, pick_chess_font
     from PyQt6.QtGui import QFont, QFontMetrics
 
@@ -398,12 +504,23 @@ def spec_tests() -> None:
 # ------------------------------------------------------- installation gelee
 
 def make_install_tree() -> Path:
-    root = Path(tempfile.mkdtemp(prefix="ax25chess-install-"))
+    """Reproduit la disposition posee par l'installateur.
+
+        Program Files\\
+        +-- AX25Chess\\ AX25Chess.exe et _internal\\
+        +-- Direwolf\\  direwolf.exe
+
+    Direwolf est un dossier VOISIN, pas un sous-dossier : c'est cette
+    disposition que bundled_direwolf() doit savoir retrouver.
+    """
+    parent = Path(tempfile.mkdtemp(prefix="ax25chess-install-"))
+    root = parent / "AX25Chess"
     internal = root / "_internal"
+    internal.mkdir(parents=True)
     shutil.copytree(ROOT / "ax25chess", internal / "ax25chess")
     if (ROOT / "assets").is_dir():
         shutil.copytree(ROOT / "assets", internal / "assets")
-    dw = root / "direwolf"
+    dw = parent / "Direwolf"
     dw.mkdir()
     exe = dw / "direwolf"
     exe.write_text(FAKE_DIREWOLF)
@@ -433,13 +550,13 @@ def frozen_tests(root: Path) -> None:
                                      icon_path, resource_root)
 
     app = QApplication.instance() or QApplication([])
-    QSettings("F4JTV", "AX25Chess").clear()
+    QSettings("AX25Chess", "AX25Chess").clear()
 
     check("resource_root pointe sur _internal", resource_root() == str(internal))
     check("application_dir pointe sur le dossier de l'executable",
           application_dir() == str(root))
-    check("Direwolf embarque detecte",
-          bundled_direwolf() == str(root / "direwolf" / "direwolf"))
+    check("Direwolf detecte dans le dossier voisin",
+          bundled_direwolf() == str(root.parent / "Direwolf" / "direwolf"))
     check("copie embarquee preferee au PATH", find_direwolf() == bundled_direwolf())
     check("icone resolue en mode gele", icon_path() is not None)
 
@@ -484,7 +601,7 @@ def frozen_tests(root: Path) -> None:
         third.close()
 
         shutil.rmtree(sandbox, ignore_errors=True)
-        shutil.rmtree(root, ignore_errors=True)
+        shutil.rmtree(root.parent, ignore_errors=True)
         print("\nTOUS LES TESTS PASSENT" if all(results)
               else "\nDES TESTS ONT ECHOUE")
         app.exit(0 if all(results) else 1)

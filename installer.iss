@@ -44,12 +44,6 @@
 #define DirewolfDir    "direwolf"
 #define HasDirewolf    DirExists(AddBackslash(SourcePath) + DirewolfDir)
 
-#if HasDirewolf
-  #define TypeFullDesc "AX25Chess et Direwolf"
-#else
-  #define TypeFullDesc "Installation complete"
-#endif
-
 [Setup]
 ; Un AppId stable est ce qui permet a une mise a jour de remplacer
 ; l'installation precedente au lieu de s'installer a cote. Cette valeur ne
@@ -84,36 +78,77 @@ OutputDir=Output
 OutputBaseFilename={#AppName}-{#AppVersion}-setup
 SetupIconFile=assets\ax25chess.ico
 WizardStyle=modern
+; Detection de la langue de l'interface Windows ; la boite de choix
+; n'apparait que si elle ne donne rien.
+ShowLanguageDialog=auto
+LanguageDetectionMethod=uilanguage
 Compression=lzma2/max
 SolidCompression=yes
-LicenseFile=LICENSE.txt
-InfoBeforeFile=INSTALL-NOTES.txt
 AllowNoIcons=yes
 CloseApplications=yes
 RestartApplications=no
 
 [Languages]
-Name: "french"; MessagesFile: "compiler:Languages\French.isl"
-Name: "english"; MessagesFile: "compiler:Default.isl"
+; L'anglais est place en premier : c'est la langue de repli quand la detection
+; echoue. Sur une machine francaise, LanguageDetectionMethod=uilanguage
+; selectionne le francais tout seul et aucune boite de dialogue n'apparait.
+;
+; La langue retenue ici est memorisee et reutilisee par le desinstallateur :
+; UsePreviousLanguage vaut yes par defaut, il n'y a rien de plus a faire.
+Name: "english"; MessagesFile: "compiler:Default.isl"; \
+    LicenseFile: "LICENSE.txt"; InfoBeforeFile: "INSTALL-NOTES.en.txt"
+Name: "french"; MessagesFile: "compiler:Languages\French.isl"; \
+    LicenseFile: "LICENSE.txt"; InfoBeforeFile: "INSTALL-NOTES.fr.txt"
 
 [Types]
-Name: "full";   Description: "{#TypeFullDesc}"
+#if HasDirewolf
+Name: "full";   Description: "{cm:TypeFullBoth}"
+#else
+Name: "full";   Description: "{cm:TypeFullPlain}"
+#endif
 #if HasDirewolf
 ; Ce type n'a de sens que s'il y a quelque chose a ne pas installer. Le
 ; declarer sans Direwolf donnerait un choix « compact » identique au choix
 ; « complet », et surtout, le referencer dans [Components] alors qu'il
 ; n'existe pas fait echouer la compilation avec « unknown type ».
-Name: "compact"; Description: "AX25Chess seul"
+Name: "compact"; Description: "{cm:TypeCompact}"
 #endif
-Name: "custom"; Description: "Installation personnalisee"; Flags: iscustom
+Name: "custom"; Description: "{cm:TypeCustom}"; Flags: iscustom
 
 [Components]
 #if HasDirewolf
 Name: "main"; Description: "AX25Chess"; Types: full compact custom; Flags: fixed
-Name: "direwolf"; Description: "Direwolf, modem logiciel (indispensable sauf si vous en avez deja un)"; Types: full custom
+Name: "direwolf"; Description: "{cm:CompDirewolf}"; Types: full custom
 #else
 Name: "main"; Description: "AX25Chess"; Types: full custom; Flags: fixed
 #endif
+
+[CustomMessages]
+; Le prefixe reprend le Name declare dans [Languages]. Une chaine sans
+; prefixe servirait a toutes les langues ; ici tout est traduit.
+english.TypeFullBoth=AX25Chess and Direwolf
+french.TypeFullBoth=AX25Chess et Direwolf
+english.TypeFullPlain=Full installation
+french.TypeFullPlain=Installation complete
+english.TypeCompact=AX25Chess only
+french.TypeCompact=AX25Chess seul
+english.TypeCustom=Custom installation
+french.TypeCustom=Installation personnalisee
+english.CompDirewolf=Direwolf software modem (needed unless you already have one)
+french.CompDirewolf=Direwolf, modem logiciel (indispensable sauf si vous en avez deja un)
+
+english.DirewolfPageTitle=Direwolf location
+french.DirewolfPageTitle=Emplacement de Direwolf
+english.DirewolfPageSubTitle=Where should Direwolf be installed?
+french.DirewolfPageSubTitle=Ou Direwolf doit-il etre installe ?
+english.DirewolfPageText=Direwolf is a separate program. It is installed next to AX25Chess rather than inside it, so that it can be used on its own or with other software.%n%nSelect a folder, then click Next.
+french.DirewolfPageText=Direwolf est un programme distinct. Il est installe a cote d'AX25Chess plutot qu'a l'interieur, afin de pouvoir servir seul ou avec d'autres logiciels.%n%nChoisissez un dossier, puis cliquez sur Suivant.
+english.DirewolfExists=This folder already contains a Direwolf installation:%n%n    %1%n%nContinuing will overwrite it. Choose another folder if you want to keep it.%n%nOverwrite?
+french.DirewolfExists=Ce dossier contient deja une installation de Direwolf :%n%n    %1%n%nPoursuivre l'ecrasera. Choisissez un autre dossier si vous souhaitez la conserver.%n%nEcraser ?
+english.RemoveDirewolf=Direwolf was installed with AX25Chess, in:%n%n    %1%n%nRemove it completely, including any configuration file and log it has written there?%n%nChoose No to keep Direwolf and use it with another program.
+french.RemoveDirewolf=Direwolf a ete installe avec AX25Chess, dans :%n%n    %1%n%nLe supprimer completement, y compris les fichiers de configuration et de journal qu'il y aurait ecrits ?%n%nRepondez Non pour conserver Direwolf et l'employer avec un autre programme.
+english.DirewolfKept=Direwolf was left in place:%n%n    %1
+french.DirewolfKept=Direwolf a ete conserve dans :%n%n    %1
 
 [Tasks]
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; \
@@ -123,19 +158,25 @@ Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; \
 Source: "{#SourceDir}\*"; DestDir: "{app}"; Components: main; \
     Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "LICENSE.txt"; DestDir: "{app}"; Components: main; Flags: ignoreversion
-Source: "README.md";   DestDir: "{app}"; Components: main; Flags: ignoreversion
-Source: "INSTALL-NOTES.txt"; DestDir: "{app}"; Components: main; Flags: ignoreversion
+Source: "README.md";    DestDir: "{app}"; Components: main; Flags: ignoreversion
+Source: "README.fr.md"; DestDir: "{app}"; Components: main; Flags: ignoreversion skipifsourcedoesntexist
+Source: "INSTALL-NOTES.en.txt"; DestDir: "{app}"; Components: main; Flags: ignoreversion
+Source: "INSTALL-NOTES.fr.txt"; DestDir: "{app}"; Components: main; Flags: ignoreversion
 
 #if HasDirewolf
 ; Direwolf va a cote de l'executable et non dans _internal, que PyInstaller
 ; reecrit a chaque montee de version. L'application le cherche a cet endroit.
-Source: "{#DirewolfDir}\*"; DestDir: "{app}\direwolf"; Components: direwolf; \
-    Flags: ignoreversion recursesubdirs createallsubdirs
+; uninsneveruninstall est ce qui donne un sens au choix propose a la
+; desinstallation : sans ce drapeau, l'executable de Direwolf serait retire
+; de toute facon et repondre « non » laisserait un dossier inutilisable.
+; La suppression est donc entierement pilotee par CurUninstallStepChanged.
+Source: "{#DirewolfDir}\*"; DestDir: "{code:GetDirewolfDir}"; Components: direwolf; \
+    Flags: ignoreversion recursesubdirs createallsubdirs uninsneveruninstall
 ; L'article 3 de la GPL-2.0 exige que les sources, ou une offre de les
 ; fournir, accompagnent toute distribution binaire. Cette notice ne doit pas
 ; etre optionnelle.
-Source: "DIREWOLF-NOTICE.txt"; DestDir: "{app}\direwolf"; Components: direwolf; \
-    Flags: ignoreversion
+Source: "DIREWOLF-NOTICE.txt"; DestDir: "{code:GetDirewolfDir}"; Components: direwolf; \
+    Flags: ignoreversion uninsneveruninstall
 #endif
 
 [InstallDelete]
@@ -143,6 +184,17 @@ Source: "DIREWOLF-NOTICE.txt"; DestDir: "{app}\direwolf"; Components: direwolf; 
 ; Direwolf que l'operateur a configure, et peut-etre edite, est laisse
 ; tranquille. C'est aussi pourquoi Direwolf n'est pas dans _internal.
 Type: filesandordirs; Name: "{app}\_internal"
+
+[Registry]
+; Le chemin choisi doit survivre a la fin de l'assistant : le
+; desinstallateur n'a pas acces aux fonctions {code:} de l'installation, et
+; l'application doit pouvoir retrouver Direwolf ou qu'il ait ete mis.
+#if HasDirewolf
+Root: HKA; Subkey: "Software\{#AppName}"; ValueType: string; \
+    ValueName: "DirewolfDir"; ValueData: "{code:GetDirewolfDir}"; \
+    Components: direwolf; Flags: uninsdeletevalue
+Root: HKA; Subkey: "Software\{#AppName}"; Flags: uninsdeletekeyifempty
+#endif
 
 [Icons]
 Name: "{group}\{#AppName}"; Filename: "{app}\{#AppExeName}"
@@ -158,19 +210,127 @@ Filename: "{app}\{#AppExeName}"; Description: "{cm:LaunchProgram,{#AppName}}"; \
 ; PyInstaller et Python laissent des __pycache__ que l'installateur n'a pas
 ; deposes : sans cela le dossier survit a la desinstallation.
 Type: filesandordirs; Name: "{app}\_internal"
-Type: dirifempty;     Name: "{app}\direwolf"
+; Pas de suppression de {app}\direwolf ici : son sort est decide par la
+; question posee dans CurUninstallStepChanged, qui s'execute avant.
 Type: dirifempty;     Name: "{app}"
 
 [Code]
-function InitializeSetup(): Boolean;
+
+(* La configuration de depart n'est volontairement pas ecrite ici : lors d'une
+   installation machine elle atterrirait sous Program Files, ou l'operateur ne
+   pourrait ni l'editer ni Direwolf y ecrire. L'application s'en charge au
+   premier lancement, dans un dossier inscriptible. *)
+
+#if HasDirewolf
+var
+  DirewolfPage: TInputDirWizardPage;
+
+function DefaultDirewolfDir(): String;
+var
+  Parent: String;
 begin
-  Result := True;
+  { Le dossier voisin de celui d'AX25Chess, et non un sous-dossier : Direwolf
+    est un programme a part entiere, qui doit pouvoir servir seul ou avec
+    d'autres logiciels. }
+  Parent := ExtractFileDir(RemoveBackslashUnlessRoot(ExpandConstant('{app}')));
+  Result := AddBackslash(Parent) + 'Direwolf';
 end;
 
-procedure CurStepChanged(CurStep: TSetupStep);
+procedure InitializeWizard();
 begin
-  { Rien a faire pour l'instant : la configuration de depart est ecrite par
-    l'application au premier lancement, dans un dossier inscriptible. La
-    faire ici la placerait sous Program Files lors d'une installation
-    machine, ou l'operateur ne pourrait ni l'editer ni Direwolf y ecrire. }
+  DirewolfPage := CreateInputDirPage(wpSelectComponents,
+    CustomMessage('DirewolfPageTitle'),
+    CustomMessage('DirewolfPageSubTitle'),
+    CustomMessage('DirewolfPageText'),
+    False, '');
+  DirewolfPage.Add('');
+end;
+
+function ShouldSkipPage(PageID: Integer): Boolean;
+begin
+  { Inutile de demander ou mettre Direwolf si on ne l'installe pas. }
+  Result := (PageID = DirewolfPage.ID) and (not WizardIsComponentSelected('direwolf'));
+end;
+
+procedure CurPageChanged(CurPageID: Integer);
+begin
+  (* La valeur par defaut depend du dossier d'installation, qui n'est connu
+     qu'apres la page de destination : elle ne peut donc pas etre posee a la
+     creation de la page.
+
+     Ce commentaire emploie la forme parenthesee parce qu'un commentaire
+     entre accolades se ferme sur la PREMIERE accolade fermante rencontree :
+     y citer une constante Inno Setup le terminerait au milieu, et la suite
+     du texte deviendrait du code. *)
+  if (CurPageID = DirewolfPage.ID) and (DirewolfPage.Values[0] = '') then
+    DirewolfPage.Values[0] := DefaultDirewolfDir();
+end;
+
+function NextButtonClick(CurPageID: Integer): Boolean;
+var
+  Chosen: String;
+  Prompt: String;
+begin
+  Result := True;
+  if CurPageID <> DirewolfPage.ID then
+    Exit;
+
+  { Le dossier voisin naturel est aussi celui qu'emploie une installation
+    ordinaire de Direwolf. Ecraser sans prevenir remplacerait une version que
+    l'operateur a peut-etre choisie et configuree. }
+  Chosen := DirewolfPage.Values[0];
+  if FileExists(AddBackslash(Chosen) + 'direwolf.exe') then
+  begin
+    { Le tableau d'arguments reste sur cette ligne : Inno Setup lit toute
+      ligne commencant par un crochet comme un en-tete de section, y compris
+      au milieu d'un bloc Pascal. }
+    Prompt := FmtMessage(CustomMessage('DirewolfExists'), [Chosen]);
+    Result := MsgBox(Prompt, mbConfirmation, MB_YESNO) = IDYES;
+  end;
+end;
+
+function GetDirewolfDir(Param: String): String;
+begin
+  Result := DirewolfPage.Values[0];
+  if Result = '' then
+    Result := DefaultDirewolfDir();
+end;
+#endif
+
+function InstalledDirewolfDir(): String;
+begin
+  (* Chemin retenu a l'installation. Le desinstallateur n'a pas acces aux
+     fonctions de rappel employees plus haut : il relit la valeur ecrite dans
+     le registre. *)
+  Result := '';
+  if not RegQueryStringValue(HKA, 'Software\{#AppName}', 'DirewolfDir', Result) then
+    Result := '';
+end;
+
+procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
+var
+  DirewolfDir: String;
+  Prompt: String;
+begin
+  if CurUninstallStep <> usUninstall then
+    Exit;
+
+  DirewolfDir := InstalledDirewolfDir();
+  if (DirewolfDir = '') or (not DirExists(DirewolfDir)) then
+    Exit;
+
+  { Les fichiers de Direwolf portent uninsneveruninstall : ils survivent a la
+    desinstallation ordinaire, et c'est cette question qui decide de leur
+    sort. Repondre Non laisse donc un Direwolf complet et fonctionnel, pas un
+    dossier vide. }
+  Prompt := FmtMessage(CustomMessage('RemoveDirewolf'), [DirewolfDir]);
+  if MsgBox(Prompt, mbConfirmation, MB_YESNO) = IDYES then
+  begin
+    DelTree(DirewolfDir, True, True, True);
+  end
+  else
+  begin
+    MsgBox(FmtMessage(CustomMessage('DirewolfKept'), [DirewolfDir]),
+           mbInformation, MB_OK);
+  end;
 end;

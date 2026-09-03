@@ -53,7 +53,7 @@ def store_tests(results: list) -> GameStore:
     # migration depuis l'ancien fichier unique
     games_mod.LEGACY_FILE.parent.mkdir(parents=True, exist_ok=True)
     games_mod.LEGACY_FILE.write_text(json.dumps({
-        "gid": "AAAA", "call": "F4JTV", "peer": "F1ABC", "color": "W",
+        "gid": "AAAA", "call": "N0CALL", "peer": "N0CALL-2", "color": "W",
         "moves": ["WP5>29", "BP5>37"], "nonce": 1, "seq": 3}))
     migrated = store.list()
     results.append(check("ancien fichier unique repris",
@@ -62,11 +62,11 @@ def store_tests(results: list) -> GameStore:
                          not games_mod.LEGACY_FILE.exists()))
 
     # plusieurs parties de front
-    store.save("BBBB", "F4JTV", "F6XYZ", "B", ["WP5>29"])
+    store.save("BBBB", "N0CALL", "N0CALL-3", "B", ["WP5>29"])
     time.sleep(0.02)
-    store.save("CCCC", "F4JTV", "F5QRP", "W", ["WP5>29", "BP5>37", "WN2>22"])
+    store.save("CCCC", "N0CALL", "N0CALL-4", "W", ["WP5>29", "BP5>37", "WN2>22"])
     time.sleep(0.02)
-    store.save("BBBB", "F4JTV", "F6XYZ", "B", ["WP5>29", "BP4>44"])
+    store.save("BBBB", "N0CALL", "N0CALL-3", "B", ["WP5>29", "BP4>44"])
     listed = store.list()
     results.append(check("trois parties menees de front", len(listed) == 3))
     results.append(check("mise a jour sans doublon",
@@ -79,7 +79,7 @@ def store_tests(results: list) -> GameStore:
     results.append(check("aucun fichier temporaire residuel",
                          not list(games_mod.GAMES_DIR.glob("*.tmp"))))
 
-    store.delete("BBBB", "F6XYZ")
+    store.delete("BBBB", "N0CALL-3")
     results.append(check("suppression effective",
                          [g.gid for g in store.list()] == ["CCCC", "AAAA"]))
     return store
@@ -92,7 +92,7 @@ def window_tests(results: list, store: GameStore) -> None:
     win.store = store
 
     # une partie jouee localement doit s'enregistrer toute seule
-    session = GameSession("F4JTV", "F1ABC", win)
+    session = GameSession("N0CALL", "N0CALL-2", win)
     session.my_color = WHITE
     session.state = GameSession.PLAYING
     session.gid = "3F1A"
@@ -103,7 +103,7 @@ def window_tests(results: list, store: GameStore) -> None:
         session.board.push(move)
         win.on_move_applied(move, False)
     results.append(check("partie en cours enregistree automatiquement",
-                         store.find("3F1A", "F1ABC") is not None))
+                         store.find("3F1A", "N0CALL-2") is not None))
     results.append(check("compteur affiche sur le bouton",
                          win.btn_games.text() == f"Parties en cours ({store.count()})"))
 
@@ -119,21 +119,21 @@ def window_tests(results: list, store: GameStore) -> None:
     win._resume_game(target)
     results.append(check("reprise d'une autre partie",
                          win.session.gid == "CCCC"
-                         and win.session.peer_call == "F5QRP"))
+                         and win.session.peer_call == "N0CALL-4"))
     results.append(check("historique rejoue integralement",
                          len(win.session.board.moves) == 3
                          and win.table.rowCount() == 3))
     results.append(check("indicatifs restaures dans l'onglet RADIO",
-                         win.ed_peer.text() == "F5QRP"))
+                         win.ed_peer.text() == "N0CALL-4"))
 
     # historique corrompu : refus propre, sans planter
-    store.save("DEAD", "F4JTV", "F9BAD", "W", ["WP5>29", "WP5>29"])
-    corrupt = store.find("DEAD", "F9BAD")
+    store.save("DEAD", "N0CALL", "N0CALL-5", "W", ["WP5>29", "WP5>29"])
+    corrupt = store.find("DEAD", "N0CALL-5")
     before = win.session.gid
     win._resume_game(corrupt)
     results.append(check("historique incoherent refuse sans casse",
                          win.session.gid == before))
-    store.delete("DEAD", "F9BAD")
+    store.delete("DEAD", "N0CALL-5")
 
     # le defaut signale : refuser puis relancer ne doit plus rien redemander
     win.close()

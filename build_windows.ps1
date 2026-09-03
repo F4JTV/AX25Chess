@@ -241,7 +241,8 @@ if ($InnoSetupPath) {
 }
 Write-Host "    $iscc"
 
-foreach ($required in @("LICENSE.txt", "INSTALL-NOTES.txt", "version.iss")) {
+foreach ($required in @("LICENSE.txt", "INSTALL-NOTES.en.txt",
+                        "INSTALL-NOTES.fr.txt", "version.iss")) {
     if (-not (Test-Path $required)) {
         Fail "$required est absent alors que installer.iss l'exige."
     }

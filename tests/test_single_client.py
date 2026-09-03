@@ -90,7 +90,7 @@ def main() -> int:
     games_mod.LEGACY_FILE = sandbox / "absent.json"
 
     app = QApplication([])
-    QSettings("F4JTV", "AX25Chess").clear()
+    QSettings("AX25Chess", "AX25Chess").clear()
 
     exe, journal = build_fake(sandbox)
     results: list[bool] = []
@@ -100,8 +100,8 @@ def main() -> int:
     win.ed_exe.setText(exe)
     win.ed_conf.setText("")
     win.sp_port.setValue(FAKE_PORT)
-    win.ed_call.setText("F4JTV")
-    win.ed_peer.setText("F1ABC")
+    win.ed_call.setText("N0CALL")
+    win.ed_peer.setText("N0CALL-2")
     win.chk_launch.setChecked(True)
     win.chk_autoconnect.setChecked(True)
     win.chk_console.setChecked(False)

@@ -10,7 +10,7 @@ ADEVICE  plughw:1,0
 
 # --- canal 0 ---------------------------------------------------------------
 CHANNEL  0
-MYCALL   F4JTV-7
+MYCALL   N0CALL-7
 MODEM    1200
 
 # --- commande d'emission ---------------------------------------------------

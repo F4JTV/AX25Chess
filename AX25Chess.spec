@@ -20,6 +20,8 @@ import os
 block_cipher = None
 
 datas = [('README.md', '.'), ('docs', 'docs')]
+if os.path.isfile('README.fr.md'):
+    datas.append(('README.fr.md', '.'))
 if os.path.isdir('assets'):
     datas.append(('assets', 'assets'))
 

@@ -23,7 +23,7 @@ def main() -> int:
     app = QApplication(sys.argv)
     app.setApplicationName("AX25Chess")
     app.setApplicationVersion(__version__)
-    app.setOrganizationName("F4JTV")
+    app.setOrganizationName("AX25Chess")
 
     icon = icon_path()
     if icon:

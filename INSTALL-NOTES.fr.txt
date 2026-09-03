@@ -1,0 +1,84 @@
+AX25CHESS - A LIRE AVANT D'INSTALLER
+====================================
+
+
+CE QUE VOUS INSTALLEZ
+
+AX25Chess est le jeu et la couche protocole AX.25. Direwolf est le modem
+logiciel qui transforme les trames en audio et commande l'emission de votre
+transceiver. Sans l'un ou sans l'autre, il n'y a pas de station.
+
+Si cet installateur propose un composant Direwolf, cochez-le, sauf si vous
+avez deja un Direwolf installe et configure.
+
+Direwolf est place dans son propre dossier A COTE d'AX25Chess, et non a
+l'interieur : il reste un programme a part entiere, utilisable seul ou avec
+d'autres logiciels. L'installateur propose un emplacement, vous laisse le
+changer, et vous previent avant d'ecraser une installation existante.
+
+Au premier lancement AX25Chess le trouve et ecrit un direwolf.conf de depart
+dans votre propre dossier de reglages, inscriptible quel que soit
+l'emplacement d'installation.
+
+S'il n'y a pas de composant Direwolf, installez-le separement depuis :
+
+    https://github.com/wb2osz/direwolf/releases
+
+
+AVANT DE COMMENCER
+
+1. Editez direwolf.conf pour votre station. Le bouton « Creer » de l'onglet
+   RADIO ecrit un fichier de depart et vous indique ou il se trouve. Il lui
+   faut au minimum un peripherique audio, votre indicatif, une vitesse de
+   modem et un port KISS :
+
+       ADEVICE  0
+       CHANNEL  0
+       MYCALL   N0CALL-7
+       MODEM    1200
+       PTT      COM3 RTS
+       KISSPORT 8001
+
+   Listez vos peripheriques audio avec :  direwolf -p
+
+2. Reglez votre indicatif et celui de votre correspondant dans l'onglet
+   RADIO. L'indicatif voyage dans chaque trame emise.
+
+3. Le port KISS de l'application et la ligne KISSPORT de direwolf.conf
+   doivent porter le meme numero. C'est la premiere chose a verifier si la
+   liaison ne s'etablit pas.
+
+
+LA CONSOLE DIREWOLF SOUS WINDOWS
+
+L'onglet DIREWOLF reste souvent vide sous Windows, et c'est normal : le
+systeme met la sortie de Direwolf en tampon de bloc des qu'elle est
+capturee, et les lignes n'arrivent que par paquets de 4 Ko. Cela n'empeche
+pas la liaison de fonctionner ; la disponibilite est etablie en sondant le
+port KISS, pas en lisant la console.
+
+Pour voir la vraie console, laissez cochee l'option « Fenetre console
+Direwolf separee » dans l'onglet RADIO. Direwolf s'ouvre alors dans sa
+propre fenetre.
+
+
+AVERTISSEMENT SMARTSCREEN
+
+Cet installateur n'est pas signe numeriquement. Windows SmartScreen affichera
+un avertissement au premier lancement. Cliquez sur « Informations
+complementaires » puis « Executer quand meme ».
+
+
+DESINSTALLATION
+
+Supprimer AX25Chess demande si Direwolf doit l'etre aussi. Repondez Non pour
+le conserver : il reste complet et utilisable, puisque c'est un programme
+distinct.
+
+
+LICENCES
+
+AX25Chess est sous GPL-2.0 ; voyez LICENSE.txt. Direwolf est un programme
+distinct, egalement sous GPL-2.0 ; si vous installez le composant Direwolf,
+lisez DIREWOLF-NOTICE.txt, en particulier si vous comptez redistribuer ce
+paquet.
