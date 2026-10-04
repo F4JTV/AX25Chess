@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Behind the adaptive launcher icon and the splash screen. -->
+    <color name="ax25chess_icon_background">#131A21</color>
+    <color name="ax25chess_splash_background">#131A21</color>
+</resources>
