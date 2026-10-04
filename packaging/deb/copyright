@@ -1,0 +1,37 @@
+Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
+Upstream-Name: AX25Chess
+
+Files: *
+Copyright: 2026 AX25Chess contributors
+License: GPL-2+
+
+Files: external/direwolf/*
+Copyright: 2011-2025 John Langner, WB2OSZ
+License: GPL-2+
+Comment: Dire Wolf, https://github.com/wb2osz/direwolf, compiled into the
+ program with the changes described in patches/direwolf and src/core.
+
+Files: packaging/udev/99-ax25chess-cm108.rules
+Copyright: 2011-2025 John Langner, WB2OSZ
+License: GPL-2+
+
+Files: assets/fonts/AX25ChessPieces.ttf
+Copyright: 2003 Bitstream, Inc.; DejaVu changes are in the public domain
+License: bitstream-vera
+Comment: The chess glyphs of DejaVu Sans, renamed "AX25Chess Pieces" as the
+ licence requires of a modified version; compiled into the program. The
+ licence text is in assets/fonts/LICENSE.txt of the source.
+
+License: GPL-2+
+ This program is free software; you can redistribute it and/or modify
+ it under the terms of the GNU General Public License as published by
+ the Free Software Foundation; either version 2 of the License, or
+ (at your option) any later version.
+ .
+ This program is distributed in the hope that it will be useful,
+ but WITHOUT ANY WARRANTY; without even the implied warranty of
+ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ GNU General Public License for more details.
+ .
+ On Debian systems, the complete text of the GNU General Public
+ License version 2 can be found in "/usr/share/common-licenses/GPL-2".

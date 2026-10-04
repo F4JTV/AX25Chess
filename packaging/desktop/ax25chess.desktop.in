@@ -1,0 +1,13 @@
+[Desktop Entry]
+Type=Application
+Name=AX25Chess
+GenericName=Packet radio chess
+GenericName[fr]=Échecs par radio packet
+Comment=Chess between two stations over AX.25 packet radio, with a built-in Dire Wolf modem
+Comment[fr]=Échecs entre deux stations par radio packet AX.25, avec un modem Dire Wolf intégré
+Exec=@BINDIR@/ax25chess
+Icon=ax25chess
+Terminal=false
+Categories=Game;BoardGame;HamRadio;Qt;
+Keywords=chess;packet;radio;AX.25;amateur;ham;modem;
+StartupNotify=true

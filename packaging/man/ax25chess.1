@@ -1,0 +1,52 @@
+.TH AX25CHESS 1 "October 2026" "AX25Chess" "User Commands"
+.SH NAME
+ax25chess \- chess over AX.25 packet radio with a built-in Dire Wolf modem
+.SH SYNOPSIS
+.B ax25chess
+[\fB\-\-config\fR \fIPATH\fR]
+[\fB\-\-modem\-conf\fR \fIPATH\fR]
+[\fB\-\-no\-modem\fR]
+.SH DESCRIPTION
+.B ax25chess
+plays chess between two amateur radio stations over AX.25 UI frames. A move
+travels as the unique identifier of the piece and the number of the
+destination square; every move carries a fingerprint of the resulting
+position, so a divergence is caught within one half-move and repaired by
+replaying the history (the CHS-1 protocol, see
+\fI/usr/share/doc/ax25chess/PROTOCOL.md\fR). The modem is Dire Wolf, compiled
+into the program: a sound card and a PTT line are all the hardware needed.
+.PP
+The modem is configured in Settings: sound card, speed, PTT and channel
+access; the program writes the matching \fIdirewolf.conf\fR to
+\fI~/.config/AX25Chess/\fR. A Dire Wolf configuration file of one's own can
+be used instead. Settings are kept in \fI~/.config/AX25Chess/config.json\fR,
+games in progress in \fI~/.local/share/AX25Chess/games/\fR.
+.SH OPTIONS
+.TP
+.BI \-\-config " PATH"
+Use this settings file instead of the default.
+.TP
+.BI \-\-modem\-conf " PATH"
+Start the modem with this \fIdirewolf.conf\fR, for this run only.
+.TP
+.B \-\-no\-modem
+Do not start the modem at start-up, whatever the settings say.
+.TP
+.B \-\-help
+Show the options and exit.
+.SH FILES
+.TP
+.I ~/.config/AX25Chess/config.json
+The settings.
+.TP
+.I ~/.config/AX25Chess/direwolf.conf
+The modem configuration generated from the settings.
+.TP
+.I ~/.local/share/AX25Chess/games/
+One file per game in progress, the move list in compact form.
+.SH NOTES
+A PTT through the GPIO of a CM108 USB sound card needs write access to its
+hidraw device; the package installs a udev rule giving it to the
+\fIaudio\fR group.
+.SH SEE ALSO
+.BR direwolf (1)

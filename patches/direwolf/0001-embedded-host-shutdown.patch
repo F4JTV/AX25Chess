@@ -1,0 +1,293 @@
+diff -ruN a/src/hdlc_rec.c b/src/hdlc_rec.c
+--- a/src/hdlc_rec.c	2026-09-27 15:51:53.672806649 +0000
++++ b/src/hdlc_rec.c	2026-09-27 15:51:53.673793870 +0000
+@@ -169,7 +169,17 @@
+ 		// TODO: FIX13 wasteful if not needed.
+ 		// Should loop on number of slicers, not max.
+ 
+-	        H->rrbb = rrbb_new(ch, sub, slice, pa->achan[ch].modem_type == MODEM_SCRAMBLE, H->lfsr, H->prev_descram);
++		// Embedded host (AX25Chess): the modem is started more than once
++		// per process.  The state array survives, so the buffer allocated
++		// by the previous start is reused rather than leaked, which is what
++		// used to trip the rrbb_new leak detector after a few restarts.
++
++	        if (H->rrbb == NULL) {
++	          H->rrbb = rrbb_new(ch, sub, slice, pa->achan[ch].modem_type == MODEM_SCRAMBLE, H->lfsr, H->prev_descram);
++	        }
++	        else {
++	          rrbb_clear (H->rrbb, pa->achan[ch].modem_type == MODEM_SCRAMBLE, H->lfsr, H->prev_descram);
++	        }
+ 	      }
+ 	    }
+ 	  }
+diff -ruN a/src/multi_modem.c b/src/multi_modem.c
+--- a/src/multi_modem.c	2026-09-27 15:51:53.674785807 +0000
++++ b/src/multi_modem.c	2026-09-27 15:51:53.675776833 +0000
+@@ -167,6 +167,22 @@
+ 
+ 	save_audio_config_p = pa;
+ 
++	// Embedded host (AX25Chess): on a restart, packets still held as
++	// candidates from the previous run would be lost by the memset below;
++	// free them first.
++	{
++	  int c, s, l;
++	  for (c = 0; c < MAX_RADIO_CHANS; c++) {
++	    for (s = 0; s < MAX_SUBCHANS; s++) {
++	      for (l = 0; l < MAX_SLICERS; l++) {
++	        if (candidate[c][s][l].packet_p != NULL) {
++	          ax25_delete (candidate[c][s][l].packet_p);
++	          candidate[c][s][l].packet_p = NULL;
++	        }
++	      }
++	    }
++	  }
++	}
+ 	memset (candidate, 0, sizeof(candidate));
+ 
+ 	demod_init (save_audio_config_p);
+diff -ruN a/src/recv.c b/src/recv.c
+--- a/src/recv.c	2026-09-27 15:51:53.668799395 +0000
++++ b/src/recv.c	2026-09-27 15:51:53.669796774 +0000
+@@ -119,6 +119,21 @@
+ 
+ 
+ static struct audio_s *save_pa;		/* Keep pointer to audio configuration */
++
++/* Embedded host support.  Set by recv_term(), polled by the audio input */
++/* threads, which return instead of calling exit().  recv_init clears it. */
++
++static volatile int recv_terminating = 0;
++static volatile int recv_active_threads = 0;
++
++/* Set in each audio input thread so recv_thread_exiting() can tell whether */
++/* the thread that is about to end is one of ours. */
++
++#if defined(_MSC_VER)
++static __declspec(thread) int recv_is_input_thread = 0;
++#else
++static _Thread_local int recv_is_input_thread = 0;
++#endif
+ 					/* for later use. */
+ 
+ /*------------------------------------------------------------------
+@@ -151,6 +166,8 @@
+ 
+ 	save_pa = pa;
+ 
++	recv_terminating = 0;
++
+ 	for (a=0; a<MAX_ADEVS; a++) {
+ 
+ 	  if (pa->adev[a].defined) {
+@@ -220,8 +237,11 @@
+ /*
+  * Get sound samples and decode them.
+  */
++	recv_active_threads++;
++	recv_is_input_thread = 1;
++
+ 	eof = 0;
+-	while ( ! eof) 
++	while ( ! eof && ! recv_terminating)
+ 	{
+ 
+ 	  int audio_sample;
+@@ -278,12 +298,53 @@
+ // Seimply terminate the application?  
+ // Try to re-init the audio device a couple times before giving up?
+ 
++	if (recv_terminating) {
++	  recv_thread_exiting ();
++	  return (0);
++	}
++
+ 	text_color_set(DW_COLOR_ERROR);
+ 	dw_printf ("Terminating after audio device %d input failure.\n", a);
+ 	exit (1);
+ }
+ 
+ 
++/*-------------------------------------------------------------------
++ *
++ * Name:        recv_term / recv_threads_active
++ *
++ * Purpose:     Let an embedding host stop the audio input threads.
++ *
++ * Description:	recv_term sets a flag.  Each input thread notices it
++ *		within one audio period and returns.  The host polls
++ *		recv_threads_active() until it reaches zero, then it is
++ *		safe to call audio_close().
++ *
++ *--------------------------------------------------------------------*/
++
++void recv_term (void)
++{
++	recv_terminating = 1;
++}
++
++/* Called by the host's exit() replacement on whatever thread is ending, */
++/* and by the input threads themselves: an input thread that ends by any */
++/* route stops being counted as active. */
++
++void recv_thread_exiting (void)
++{
++	if (recv_is_input_thread) {
++	  recv_is_input_thread = 0;
++	  recv_active_threads--;
++	}
++}
++
++int recv_threads_active (void)
++{
++	return (recv_active_threads);
++}
++
++
+ 
+ 
+ 
+diff -ruN a/src/recv.h b/src/recv.h
+--- a/src/recv.h	2026-09-27 15:51:53.670791338 +0000
++++ b/src/recv.h	2026-09-27 15:51:53.671781774 +0000
+@@ -3,4 +3,12 @@
+ 
+ void recv_init (struct audio_s *pa);
+ 
+-void recv_process (void);
+\ No newline at end of file
++void recv_process (void);
++
++/* Embedded host support: ask the audio input threads to finish. */
++
++void recv_term (void);
++
++int recv_threads_active (void);
++
++void recv_thread_exiting (void);
+\ No newline at end of file
+diff -ruN a/src/tq.c b/src/tq.c
+--- a/src/tq.c	2026-09-27 15:51:53.662761944 +0000
++++ b/src/tq.c	2026-09-27 15:51:53.663821351 +0000
+@@ -75,6 +75,11 @@
+ 
+ #endif
+ 
++/* Set by tq_term() when an embedding host shuts the modem down. */
++/* Transmit threads poll it through tq_is_terminating(). */
++
++static volatile int tq_terminating = 0;
++
+ static int tq_is_empty (int chan);
+ 
+ 
+@@ -140,6 +145,8 @@
+ 
+ 	dw_mutex_init(&tq_mutex);
+ 
++	tq_terminating = 0;
++
+ /*
+  * Windows and Linux have different wake up methods.
+  * Put a wrapper around this someday to hide the details.
+@@ -794,7 +801,7 @@
+ 	dw_printf ("tq_wait_while_empty (%d): is_empty = %d\n", chan, is_empty);
+ #endif
+ 
+-	if (is_empty) {
++	if (is_empty && ! tq_terminating) {
+ #if DEBUG
+ 	  text_color_set(DW_COLOR_DEBUG);
+ 	  dw_printf ("tq_wait_while_empty (%d): SLEEP - about to call cond wait\n", chan);
+@@ -1096,4 +1103,45 @@
+ 
+ } /* end tq_count */
+ 
++/*-------------------------------------------------------------------
++ *
++ * Name:        tq_term / tq_is_terminating
++ *
++ * Purpose:     Let an embedding host shut the transmit side down.
++ *
++ * Description:	The stand-alone application never stops the transmit
++ *		threads; it simply exits.  An application that embeds the
++ *		modem needs them to return so the audio device can be
++ *		closed and everything re-initialised later.
++ *
++ *		tq_term sets a flag and wakes every transmit thread.
++ *		xmit_thread polls tq_is_terminating() and returns.
++ *		tq_init clears the flag again.
++ *
++ *--------------------------------------------------------------------*/
++
++void tq_term (void)
++{
++	int c;
++
++	tq_terminating = 1;
++
++	for (c = 0; c < MAX_RADIO_CHANS; c++) {
++#if __WIN32__
++	  if (wake_up_event[c] != NULL) {
++	    SetEvent (wake_up_event[c]);
++	  }
++#else
++	  dw_mutex_lock (&(wake_up_mutex[c]));
++	  pthread_cond_signal (&(wake_up_cond[c]));
++	  dw_mutex_unlock (&(wake_up_mutex[c]));
++#endif
++	}
++}
++
++int tq_is_terminating (void)
++{
++	return (tq_terminating);
++}
++
+ /* end tq.c */
+diff -ruN a/src/tq.h b/src/tq.h
+--- a/src/tq.h	2026-09-27 15:51:53.664851961 +0000
++++ b/src/tq.h	2026-09-27 15:51:53.665826861 +0000
+@@ -36,6 +36,12 @@
+ 
+ int tq_count (int chan, int prio, char *source, char *dest, int bytes);
+ 
++/* Embedded host support: ask the transmit threads to finish and wake them. */
++
++void tq_term (void);
++
++int tq_is_terminating (void);
++
+ #endif
+ 
+ /* end tq.h */
+diff -ruN a/src/xmit.c b/src/xmit.c
+--- a/src/xmit.c	2026-09-27 15:51:53.666772779 +0000
++++ b/src/xmit.c	2026-09-27 15:51:53.667758203 +0000
+@@ -517,9 +517,13 @@
+ 	int ok;
+ 
+ 
+-	while (1) {
++	while ( ! tq_is_terminating()) {
+ 
+ 	  tq_wait_while_empty (chan);
++
++	  if (tq_is_terminating()) {
++	    break;
++	  }
+ #if DEBUG
+ 	  text_color_set(DW_COLOR_DEBUG);
+ 	  dw_printf ("xmit_thread, channel %d: woke up\n", chan);
+@@ -644,9 +648,9 @@
+ 	      } /* wait for clear channel error. */
+ 	    } /* Have pp */
+ 	  } /* while queue not empty */
+-	} /* while 1 */
++	} /* while not terminating */
+ 
+-	return 0;	/* unreachable but quiet the warning. */
++	return 0;	/* Only reached when tq_term() was called. */
+ 
+ } /* end xmit_thread */
+ 

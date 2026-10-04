@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>io.github.ax25chess.AX25Chess</id>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>GPL-2.0-or-later</project_license>
+  <name>AX25Chess</name>
+  <summary>Chess over AX.25 packet radio with a built-in modem</summary>
+  <description>
+    <p>
+      Point-to-point chess between two amateur radio stations over AX.25 UI
+      frames. Every move carries a fingerprint of the resulting position, so
+      both boards stay identical on a slow and lossy channel; a divergence is
+      repaired by replaying the history.
+    </p>
+    <p>
+      The modem is Dire Wolf, compiled into the program: a sound card and a
+      PTT line are all the hardware needed.
+    </p>
+  </description>
+  <launchable type="desktop-id">ax25chess.desktop</launchable>
+  <categories>
+    <category>Game</category>
+    <category>HamRadio</category>
+  </categories>
+  <releases>
+    <release version="@PROJECT_VERSION@" date="@AX25CHESS_RELEASE_DATE@"/>
+  </releases>
+  <content_rating type="oars-1.1"/>
+</component>

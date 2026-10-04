@@ -1,0 +1,46 @@
+ax25chess (2.0.3) unstable; urgency=medium
+
+  * Phone: controls of Settings stuck out past the right edge in portrait. In
+    a Qt Quick layout an item that does not fill the width keeps its implicit
+    width, and a switch or a button is as wide as its label on one line: the
+    long (French) ones widened their whole card. Switches and buttons of
+    Settings now take the column's width and wrap their labels; the buttons
+    under the board and on the Game page share the width equally and shrink
+    their type rather than break a word; the header's title gives way first.
+  * Android: portrait only. The generated manifest fixes the activity's
+    orientation, whether Qt's template sets one or not.
+  * Tests: every control of every page must fit a 360 and a 412 dp wide phone
+    held upright, in French.
+
+ -- AX25Chess Community <noreply@ax25chess.invalid>  Sun, 04 Oct 2026 15:15:16 +0000
+
+ax25chess (2.0.2) unstable; urgency=medium
+
+  * Windows: the build looped on "Re-running CMake..." when the project's
+    files were dated later than the computer's clock (typically Windows two
+    hours behind on a PC that also runs Linux). build_all.bat now sets such
+    files to now (scripts/fix_timestamps.ps1), and stops with Ninja's
+    explanation if build.ninja is still out of date after configuring.
+
+ -- AX25Chess Community <noreply@ax25chess.invalid>  Sun, 04 Oct 2026 14:40:21 +0000
+
+ax25chess (2.0.1) unstable; urgency=medium
+
+  * Android: the manifest step of build_android.sh failed on an apostrophe
+    inside a Python string, so the APK would have lost its foreground
+    service, its splash screen and background_running.
+  * Android: the configuration stopped on install(TARGETS) without a LIBRARY
+    destination; on Android the program is a shared library packaged by
+    androiddeployqt, and the install rule now applies to the desktop only.
+
+ -- AX25Chess Community <noreply@ax25chess.invalid>  Sun, 04 Oct 2026 14:20:12 +0000
+
+ax25chess (2.0.0) unstable; urgency=medium
+
+  * Rewritten in C++ with Qt 6 and Qt Quick, for Windows, Linux and Android.
+    Dire Wolf is compiled into the program: no separate modem to install.
+  * CHS-1 protocol unchanged; plays against the Python version 1.x.
+  * A second invitation from the same correspondent is no longer taken for a
+    duplicate of the first.
+
+ -- AX25Chess Community <noreply@ax25chess.invalid>  Sun, 04 Oct 2026 12:00:00 +0000
