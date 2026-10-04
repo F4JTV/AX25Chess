@@ -1,0 +1,20 @@
+AX25Chess - chess over AX.25 packet radio
+Copyright (C) 2026 AX25Chess contributors
+
+This program is free software; you can redistribute it and/or modify it
+under the terms of the GNU General Public License as published by the Free
+Software Foundation; either version 2 of the License, or (at your option)
+any later version.
+
+This program is distributed in the hope that it will be useful, but WITHOUT
+ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
+more details; its text is in the file COPYING.
+
+The program contains Dire Wolf, an amateur radio soundcard modem by John
+Langner, WB2OSZ (https://github.com/wb2osz/direwolf), GPL version 2 or
+later, compiled in with the changes in patches/direwolf and src/core. It
+links with Qt (https://www.qt.io), LGPL version 3; the combination is
+distributed under the terms of the GNU GPL version 3. On Android it links
+with Oboe (Apache License 2.0). The piece font is a subset of DejaVu Sans,
+Bitstream Vera licence, see assets/fonts/LICENSE.txt.
