@@ -232,6 +232,7 @@ private:
     QMap<int, QString> m_seen;          // received seq -> type, against duplicates
     QString m_result;
     QString m_resultCode;
+    bool m_invitedByMe = false;         // our HELLO opened the handshake
     bool m_drawOfferedByPeer = false;
     bool m_drawOfferedByMe = false;
     QMap<int, QString> m_syncParts;

@@ -25,6 +25,7 @@
 #include <QRegularExpression>
 #include <QTemporaryDir>
 #include <QtTest>
+#include <QJsonObject>
 #include <functional>
 
 namespace {
@@ -178,6 +179,19 @@ private slots:
         overflowing.removeDuplicates();
         QVERIFY2(overflowing.isEmpty(), qPrintable(QStringLiteral("window %1 wide:\n  ").arg(window->width())
                                                    + overflowing.join(QStringLiteral("\n  "))));
+    }
+
+    void oldTxtailDefaultIsRaised()
+    {
+        AppConfig old = AppConfig::fromJson({{"modem", QJsonObject{{"txtail", 5}}}});
+        QCOMPARE(old.radio.modem.txtail, 10);
+        QVERIFY(old.txtailRaised);
+        AppConfig chosen = AppConfig::fromJson({{"modem", QJsonObject{{"txtail", 7}}}});
+        QCOMPARE(chosen.radio.modem.txtail, 7);
+        AppConfig current = AppConfig::fromJson({{"schema", 2}, {"modem", QJsonObject{{"txtail", 5}}}});
+        QCOMPARE(current.radio.modem.txtail, 5);
+        QVERIFY(!current.txtailRaised);
+        QCOMPARE(AppConfig::fromJson(old.toJson()).radio.modem.txtail, 10);
     }
 
     void playByClicking_data()

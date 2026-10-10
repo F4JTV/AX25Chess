@@ -281,6 +281,16 @@ void GameSession::ackDone(int seq, double now)
 
 void GameSession::ack(const Frame &f, double now)
 {
+    // A reliable frame counts as received only once it is acknowledged: a
+    // frame turned down without an ACK (a move out of sequence, a bad
+    // fingerprint...) must be handled again when it is repeated, not taken
+    // for a duplicate and acknowledged without having been applied.
+    if (isReliable(f.type)) {
+        m_seen.insert(f.seq, f.type);
+        if (m_seen.size() > 200) {
+            for (int i = 0; i < 100 && !m_seen.isEmpty(); i++) m_seen.erase(m_seen.begin());
+        }
+    }
     send(Ack, QStringList{QString::number(f.seq), positionHash(m_board)}.join(QLatin1Char(';')), now, false);
 }
 
@@ -291,6 +301,7 @@ void GameSession::invite(double now)
     m_gid = QStringLiteral("%1").arg(m_rng.generate() & 0xFFFF, 4, 16, QLatin1Char('0')).toUpper();
     m_myNonce = m_rng.generate();
     m_state = State::Handshake;
+    m_invitedByMe = true;
     m_board = Board();
     m_myColor = 0;
     m_peerNonce.reset();
@@ -394,6 +405,7 @@ void GameSession::restore(const QString &gid, char myColor, quint32 myNonce, std
     m_resultCode.clear();
     m_drawOfferedByMe = m_drawOfferedByPeer = false;
     m_state = State::Playing;
+    m_invitedByMe = false;
     const Board::Status status = m_board.status();
     if (status != Board::Status::Playing) {
         m_state = State::Over;
@@ -436,7 +448,17 @@ void GameSession::feed(const QByteArray &info, const QString &srcFromAx25, doubl
     }
     const Frame &f = *parsed;
     const QString dst = f.dst.toUpper();
-    if (dst != m_myCall && dst != QLatin1String("ALL") && dst != QLatin1String("CQ")) return;
+    if (dst != m_myCall && dst != QLatin1String("ALL") && dst != QLatin1String("CQ")) {
+        // Games between other stations are none of ours.  But the
+        // correspondent writing to another callsign means the two stations
+        // disagree on this one's (an SSID, a typing slip): dropped in
+        // silence, the frame looked like one the radio never decoded.
+        if (f.src.toUpper() == m_peerCall) {
+            emit logMessage(Level::Warn, tr("Frame from %1 addressed to %2, not to this station (%3) - check the callsigns")
+                                             .arg(f.src, f.dst, m_myCall));
+        }
+        return;
+    }
     if (f.src.toUpper() != m_peerCall) {
         emit logMessage(Level::Warn, tr("Frame received from %1, expected peer %2 - ignored").arg(f.src, m_peerCall));
         return;
@@ -454,7 +476,21 @@ void GameSession::feed(const QByteArray &info, const QString &srcFromAx25, doubl
     // duplicate - acknowledged, never answered, the inviter stuck in the
     // handshake.  (The Python version 1.0 has this defect; a retransmitted
     // HELLO of the same game keeps its gid and is still deduplicated.)
-    if (f.type == Hello && f.gid != m_gid) m_seen.clear();
+    if (f.type == Hello && f.gid != m_gid) {
+        // Both stations invited at once: each would accept the other's
+        // HELLO and end up in a different game.  While our own HELLO is
+        // still unacknowledged, both keep the invitation with the smaller
+        // game id; the other HELLO is left unanswered and its sender, on
+        // receiving ours, accepts it.  Once ours has been acknowledged, a
+        // new HELLO from the peer is a deliberate new invitation.
+        const bool ourHelloInFlight = m_state == State::Handshake && m_invitedByMe && m_pending
+                                      && m_pending->frame.type == Hello && m_pending->frame.gid == m_gid;
+        if (ourHelloInFlight && f.gid.toUInt(nullptr, 16) > m_gid.toUInt(nullptr, 16)) {
+            emit logMessage(Level::Info, tr("Crossed invitations: game %1 kept, %2 set aside").arg(m_gid, f.gid));
+            return;
+        }
+        m_seen.clear();
+    }
 
     // Duplicate: acknowledge again without replaying.  This idempotence is
     // what keeps a lost ACK from deadlocking the game.
@@ -462,13 +498,6 @@ void GameSession::feed(const QByteArray &info, const QString &srcFromAx25, doubl
         ack(f, now);
         return;
     }
-    if (isReliable(f.type)) {
-        m_seen.insert(f.seq, f.type);
-        if (m_seen.size() > 200) {
-            for (int i = 0; i < 100 && !m_seen.isEmpty(); i++) m_seen.erase(m_seen.begin());
-        }
-    }
-
     if (f.type == Hello) rxHello(f, now);
     else if (f.type == Accept) rxAccept(f, now);
     else if (f.type == MoveType) rxMove(f, now);
@@ -507,6 +536,12 @@ void GameSession::rxHello(const Frame &f, double now)
     if (fields.isEmpty() || !parseHex32(fields.at(0), &nonce)) return;
     m_peerNonce = nonce;
     m_gid = f.gid;
+    m_invitedByMe = false;
+    // Whatever the previous game left to send (a move or a message waiting
+    // for an ACK that will never come: the peer ignores another game's
+    // frames) would hold the ACPT behind it for ever.
+    m_pending.reset();
+    m_queue.clear();
     if (m_myNonce == 0) m_myNonce = m_rng.generate();
     m_board = Board();
     m_result.clear();
@@ -568,6 +603,13 @@ void GameSession::rxMove(const Frame &f, double now)
     const QString theirHash = fields.at(5);
     if (!okFrom || !okTo || !okPly || fromSq < 0 || toSq < 0) {
         emit logMessage(Level::Error, tr("Received move could not be read"));
+        return;
+    }
+    if (m_state == State::Over) {
+        // The game ended here (a resignation, a mate) before the peer knew:
+        // acknowledge, or its retransmissions would never stop.
+        emit logMessage(Level::Info, tr("Move received after the end of the game - acknowledged, not played"));
+        ack(f, now);
         return;
     }
     if (m_state != State::Playing) {

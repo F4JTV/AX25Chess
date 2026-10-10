@@ -37,13 +37,23 @@ struct ModemConfig
     // What the generated file says.
     QString audioIn = QStringLiteral("default");
     QString audioOut = QStringLiteral("default");
+#ifdef Q_OS_ANDROID
+    // Fixed on a phone (RadioConfig.cpp): its audio runs at 48 kHz.
+    int sampleRate = 48000;
+#else
     int sampleRate = 44100;
+#endif
     int speed = 1200;                // MODEM: 300, 1200 or 9600
     QString ptt = QStringLiteral("none");   // none (VOX), rts, dtr, cm108
     QString pttDevice;               // serial port for rts/dtr; optional HID path for cm108
     int gpio = 3;                    // CM108 GPIO pin
     int txdelay = 30;                // * 10 ms
-    int txtail = 5;                  // * 10 ms
+    // * 10 ms.  Dire Wolf's own default, 100 ms: flags sent after the last
+    // frame, so that the end of the frame is on the air before the PTT
+    // drops even when the sound comes out late (a phone, PipeWire).  It was
+    // 50 ms up to 2.0.3, short enough to cut the FCS of frames sent from a
+    // phone.
+    int txtail = 10;
     int persistence = 63;            // transmit probability (p + 1) / 256
     int slottime = 10;               // * 10 ms
     bool fullDuplex = false;

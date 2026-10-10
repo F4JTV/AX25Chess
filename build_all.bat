@@ -141,12 +141,10 @@ if not exist "%DIREWOLF_DIR%\src\direwolf.h" (
     echo [X] Dire Wolf sources not found in %DIREWOLF_DIR%. Run build_all.bat /deps
     goto fail
 )
-findstr /c:"tq_term" "%DIREWOLF_DIR%\src\tq.h" >nul 2>&1
-if errorlevel 1 (
-    echo [X] The Dire Wolf sources in %DIREWOLF_DIR% do not carry the patch.
-    echo     Run build_all.bat /deps, or apply patches\direwolf\*.patch by hand.
-    goto fail
-)
+rem Every run: a tree patched by an older release gets the patches added
+rem since; those already in place are recognised and left alone.
+call :patches
+if errorlevel 1 goto fail
 echo [ok] Dire Wolf   %DIREWOLF_DIR%
 
 rem ------------------------------------------------------------- timestamps
@@ -301,18 +299,30 @@ if not exist "%DIREWOLF_DIR%\src\direwolf.h" (
         exit /b 1
     )
 )
-findstr /c:"tq_term" "%DIREWOLF_DIR%\src\tq.h" >nul 2>&1
+call :patches
+if errorlevel 1 exit /b 1
+echo [ok] Dire Wolf sources ready
+exit /b 0
+
+rem Applies each patch of patches\direwolf that the tree does not carry yet:
+rem one whose reverse applies cleanly is in place already.
+:patches
+where git >nul 2>&1
 if errorlevel 1 (
-    echo   Applying patches\direwolf\*.patch...
-    for %%P in (patches\direwolf\*.patch) do (
+    echo [X] git is needed to patch the Dire Wolf sources: https://git-scm.com/download/win
+    exit /b 1
+)
+for %%P in (patches\direwolf\*.patch) do (
+    git -C "%DIREWOLF_DIR%" apply --reverse --check --ignore-whitespace "%CD%\%%P" >nul 2>&1
+    if errorlevel 1 (
+        echo   Applying %%~nxP
         git -C "%DIREWOLF_DIR%" apply --ignore-whitespace "%CD%\%%P"
         if errorlevel 1 (
-            echo [X] %%P does not apply to the sources in %DIREWOLF_DIR%.
+            echo [X] %%~nxP does not apply to the sources in %DIREWOLF_DIR%.
             exit /b 1
         )
     )
 )
-echo [ok] Dire Wolf sources ready
 exit /b 0
 
 :usage

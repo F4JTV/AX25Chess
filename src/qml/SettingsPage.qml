@@ -263,6 +263,8 @@ Item {
                             text: qsTr("The phone's audio: Android switches to a USB sound card or headset by itself when one is plugged in.")
                         }
                         Field {
+                            // Fixed at 48 kHz on a phone (RadioConfig.cpp).
+                            visible: !window.android
                             label: qsTr("Sample rate")
                             ComboBox {
                                 width: parent.width

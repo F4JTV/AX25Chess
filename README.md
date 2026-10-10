@@ -154,6 +154,10 @@ Sound cards: on Linux the list comes from ALSA, by card id
 numbers; *System default* goes through PipeWire or PulseAudio. On Windows,
 the device numbers Dire Wolf uses. On Android, the phone's audio: Android
 switches to a USB sound card or headset by itself when one is plugged in.
+The rate is fixed at 48000 Hz there, the phone's own. The modem log shows
+what each stream obtained (`Audio input: ... normal mode, buffer 1000 ms`)
+and reports any `Audio input overrun`: audio the phone dropped, and with it
+the frames heard at that moment.
 
 PTT:
 

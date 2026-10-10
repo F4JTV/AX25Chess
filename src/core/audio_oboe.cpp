@@ -6,7 +6,11 @@
  * block buffer per direction and moves whole blocks through Oboe's blocking
  * read() and write(), which is the simplest arrangement that never starves
  * the demodulator: the audio input thread of recv.c blocks in read() and
- * the transmit thread blocks in write(), exactly as they do on ALSA.
+ * the transmit thread blocks in write(), exactly as they do on ALSA.  The
+ * input is opened on Android's normal path with a second of buffer, like
+ * the large buffer ALSA gives on the desktop, so the time the demodulator
+ * spends between two reads never costs audio; overruns, if any, are told
+ * in the modem log.  The output stays low-latency for a tight PTT.
  *
  * Only real devices: "stdin" and "udp:" inputs of the desktop are not
  * available.  ADEVICE takes "default" or a numeric Android audio device id.
@@ -17,12 +21,15 @@
  * SPDX-License-Identifier: GPL-2.0-or-later
  */
 
+// <cstring> first: some Oboe headers use memset without including it.
+#include <cstring>
 #include <oboe/Oboe.h>
 
 #include <cstdlib>
 #include <cstring>
 #include <memory>
 #include <thread>
+#include <algorithm>
 #include <chrono>
 
 // direwolf.h declares strcasestr() the C way, which collides with the C++
@@ -41,6 +48,11 @@ namespace {
 constexpr int BlockBytes = 4096;
 constexpr int64_t ReadTimeoutNs = 2000000000LL;    // 2 s: a stalled stream reports an error
 constexpr int64_t WriteTimeoutNs = 5000000000LL;
+// The input keeps this much audio while the demodulator is busy elsewhere,
+// see openStream().  Room, not delay: a reader that keeps up finds it empty.
+constexpr int InputCapacityMs = 1000;
+// How often the input's overrun counter is looked at.
+constexpr std::chrono::seconds XrunCheckPeriod{5};
 
 struct Device {
     std::shared_ptr<oboe::AudioStream> in;
@@ -62,6 +74,9 @@ struct Device {
     bool inBroken = false;
     int inRetries = 0;
     std::chrono::steady_clock::time_point inNextRetry;
+    // Overruns of the current input stream already reported.
+    int32_t inXruns = 0;
+    std::chrono::steady_clock::time_point inXrunCheck;
     bool outBroken = false;
     std::chrono::steady_clock::time_point outNextRetry;
 };
@@ -91,7 +106,6 @@ std::shared_ptr<oboe::AudioStream> openStream(oboe::Direction direction, int32_t
     oboe::AudioStreamBuilder builder;
     builder.setDirection(direction)
         ->setSharingMode(oboe::SharingMode::Shared)
-        ->setPerformanceMode(oboe::PerformanceMode::LowLatency)
         ->setFormat(oboe::AudioFormat::I16)
         ->setFormatConversionAllowed(true)
         ->setChannelCount(channels)
@@ -99,7 +113,22 @@ std::shared_ptr<oboe::AudioStream> openStream(oboe::Direction direction, int32_t
         ->setSampleRateConversionQuality(oboe::SampleRateConversionQuality::Medium)
         ->setDeviceId(device);
     if (direction == oboe::Direction::Input) {
-        builder.setInputPreset(oboe::InputPreset::Unprocessed);   // no AGC, no noise suppression on packet audio
+        // The receiver is Dire Wolf's own thread: it reads one block (43 ms
+        // at 48 kHz), demodulates it, and only then reads again.  A
+        // low-latency input keeps a few milliseconds of audio (a FAST track
+        // or an MMAP buffer, Oboe's AudioStreamAAudio.cpp says as much): the
+        // time spent demodulating a block, or any pause of the thread on a
+        // phone that slows its CPU down when idle, and the phone drops the
+        // audio that arrived meanwhile.  At 1200 baud a bit lasts 0.83 ms, so
+        // a gap of a few ms costs the frame its CRC - the frames of the other
+        // station were lost, while the desktop, where ALSA keeps a buffer
+        // many periods long, decoded them all.  A packet receiver has no use
+        // for low latency: the normal path, with a second of room.
+        builder.setPerformanceMode(oboe::PerformanceMode::None)
+            ->setBufferCapacityInFrames(rate * InputCapacityMs / 1000)
+            ->setInputPreset(oboe::InputPreset::Unprocessed);   // no AGC, no noise suppression on packet audio
+    } else {
+        builder.setPerformanceMode(oboe::PerformanceMode::LowLatency);
     }
     std::shared_ptr<oboe::AudioStream> stream;
     const oboe::Result result = builder.openStream(stream);
@@ -115,10 +144,14 @@ std::shared_ptr<oboe::AudioStream> openStream(oboe::Direction direction, int32_t
         stream->close();
         return nullptr;
     }
+    const int capacity = stream->getBufferCapacityInFrames();
     text_color_set(DW_COLOR_INFO);
-    dw_printf("Audio %s: device %d, %d Hz, %d channel(s), %s.\n", label, stream->getDeviceId(),
+    dw_printf("Audio %s: device %d, %d Hz, %d channel(s), %s, %s mode, buffer %d ms.\n", label, stream->getDeviceId(),
               stream->getSampleRate(), stream->getChannelCount(),
-              stream->getAudioApi() == oboe::AudioApi::AAudio ? "AAudio" : "OpenSL ES");
+              stream->getAudioApi() == oboe::AudioApi::AAudio ? "AAudio" : "OpenSL ES",
+              stream->getPerformanceMode() == oboe::PerformanceMode::LowLatency ? "low-latency"
+              : stream->getPerformanceMode() == oboe::PerformanceMode::PowerSaving ? "power-saving" : "normal",
+              capacity > 0 && stream->getSampleRate() > 0 ? static_cast<int>(1000LL * capacity / stream->getSampleRate()) : 0);
     return stream;
 }
 
@@ -176,6 +209,7 @@ static bool recoverInput(Device &d, const char *why)
     if (!fresh) return false;
     d.in = fresh;
     d.inBroken = false;
+    d.inXruns = 0;          // a new stream counts from zero
     text_color_set(DW_COLOR_INFO);
     dw_printf("Audio input back after %d attempt(s).\n", d.inRetries);
     return true;
@@ -202,6 +236,22 @@ static bool recoverOutput(Device &d, const char *why)
     return true;
 }
 
+// Audio the input had to drop because it was not read in time, said in the
+// modem log: lost audio is lost frames, and nothing else would show it.
+static void reportOverruns(Device &d)
+{
+    const auto now = std::chrono::steady_clock::now();
+    if (now < d.inXrunCheck) return;
+    d.inXrunCheck = now + XrunCheckPeriod;
+    if (!d.in->isXRunCountSupported()) return;
+    const oboe::ResultWithValue<int32_t> xruns = d.in->getXRunCount();
+    if (!xruns || xruns.value() <= d.inXruns) return;
+    text_color_set(DW_COLOR_ERROR);
+    dw_printf("Audio input overrun: %d more, %d since the input opened. The receiver lost audio and may have missed frames.\n",
+              xruns.value() - d.inXruns, xruns.value());
+    d.inXruns = xruns.value();
+}
+
 // One octet of input.  Blocks until a block arrives; while the stream is
 // down, a block of silence at the stream's own pace, never an end of
 // stream: Dire Wolf's receiver treats one of those as fatal.
@@ -218,6 +268,7 @@ extern "C" int audio_get(int a)
             } else if (result.value() > 0) {
                 d.inLen = result.value() * d.bytesPerFrame;
                 haveData = true;
+                reportOverruns(d);
             }
         } else {
             recoverInput(d, "stream closed");
@@ -268,16 +319,32 @@ extern "C" int audio_flush(int a)
     return 0;
 }
 
-// Wait until what was written has left the device, before the PTT is
-// released.  Oboe has no drain; waiting for the stream's buffer to play
-// out is the equivalent.
+// Wait until the last sample written has been played, before the PTT is
+// released.  Dire Wolf releases it as soon as audio_wait() returns and the
+// frame's own duration has elapsed since keying - but on a phone the sound
+// comes out a whole output latency after it is written (the mixer, the HAL,
+// a USB sound card: 40 to well over 100 ms).  Returning once the buffer was
+// handed over, as before, cut the end of every frame - the FCS and the
+// closing flag - whenever that latency exceeded TXTAIL: frames sent from the
+// phone, the ACKs among them, were lost.
+//
+// Oboe's calculateLatencyMillis() is how long a frame written now takes to
+// be heard: waiting that long after the last write covers what is buffered
+// and what lies beyond.  Without it (OpenSL ES, or a stream that cannot say
+// yet), the buffer's duration plus a margin for the rest of the path.
 extern "C" void audio_wait(int a)
 {
     Device &d = g_dev[a];
     audio_flush(a);
     if (!d.out || d.outBroken) return;
-    const int32_t buffered = d.out->getBufferSizeInFrames();
-    const int ms = static_cast<int>(1000LL * buffered / d.rate) + 20;
+    int ms = -1;
+    const oboe::ResultWithValue<double> latency = d.out->calculateLatencyMillis();
+    if (latency && latency.value() > 0) ms = static_cast<int>(latency.value() + 0.5) + 10;
+    if (ms < 0) {
+        const int32_t buffered = d.out->getBufferSizeInFrames();
+        ms = static_cast<int>(1000LL * buffered / d.rate) + 60;
+    }
+    ms = std::min(ms, 1000);       // a nonsense estimate must not hold the PTT down
     std::this_thread::sleep_for(std::chrono::milliseconds(ms));
 }
 

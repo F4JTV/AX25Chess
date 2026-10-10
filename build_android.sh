@@ -127,9 +127,9 @@ step "Checking prerequisites"
 [ -d "$SDK_ROOT/platforms/android-$PLATFORM" ] || die "Android platform $PLATFORM not found (run --setup)."
 [ -d "$QT_ANDROID/lib/cmake/Qt6Quick" ] || die "Qt Quick missing from $QT_ANDROID: reinstall the base package (--setup)."
 command -v java >/dev/null 2>&1 || die "java missing: sudo apt install openjdk-17-jdk-headless"
-if [ ! -f "$SRC_DIR/external/direwolf/src/direwolf.h" ]; then
-    "$SRC_DIR/scripts/fetch_direwolf.sh" || die "Could not fetch the Dire Wolf sources."
-fi
+# Every time: it clones only when the tree is missing, and applies any patch
+# a newer release added to a tree patched by an older one.
+"$SRC_DIR/scripts/fetch_direwolf.sh" >/dev/null || die "Could not fetch or patch the Dire Wolf sources."
 VERSION="$(sed -n 's/^project(AX25Chess VERSION \([0-9.]*\).*/\1/p' "$SRC_DIR/CMakeLists.txt" | head -1)"
 say "Version     ${VERSION:-unknown}"
 say "Qt          $QT_ANDROID"

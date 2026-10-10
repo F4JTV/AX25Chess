@@ -46,6 +46,9 @@ struct AppConfig
     GameConfig game;
     UiConfig ui;
     bool configured = false;         // false until the first save
+    // config.json written by 2.0.3 or older kept TXTAIL at the old default,
+    // 50 ms; it is raised to 100 ms on reading (see RadioConfig.h).
+    bool txtailRaised = false;
 
     QJsonObject toJson() const;
     static AppConfig fromJson(const QJsonObject &json);

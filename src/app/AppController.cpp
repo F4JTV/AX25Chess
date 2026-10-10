@@ -20,6 +20,7 @@
 #include <QClipboard>
 #include <QCoreApplication>
 #include <QDateTime>
+#include <QDebug>
 #include <QDir>
 #include <QFile>
 #include <QFontDatabase>
@@ -73,6 +74,9 @@ AppController::AppController(const AppConfig &config, QObject *parent)
         // 0 info, 1 error, 2 received, 3 decoded, 4 transmitted, 5 debug.
         static const char *names[] = {"info", "error", "rx", "info", "tx", "debug"};
         if (level == 5) return;
+        // The console too (a terminal on the desktop, logcat on Android):
+        // what the modem said last survives a crash of the program.
+        qInfo().noquote() << "modem:" << line;
         if (level != 1 && !m_config.radio.modem.echoLog) return;
         m_modemLog.append(QString::fromLatin1(names[qBound(0, level, 5)]), line);
     });
@@ -130,6 +134,10 @@ void AppController::startup()
     if (!m_config.configured) {
         log(QStringLiteral("warn"), tr("First run: enter your callsign and your correspondent's in Settings, "
                                        "then the sound card and PTT of the modem."));
+    }
+    if (m_config.txtailRaised) {
+        log(QStringLiteral("warn"), tr("TXTAIL raised from 50 to 100 ms, the new default: with 50 ms a phone cut the end of "
+                                       "its frames. Saving the settings keeps it."));
     }
     if (m_config.radio.modem.autoStart && !m_noModem) startStation();
 }

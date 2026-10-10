@@ -69,6 +69,13 @@ ModemConfig ModemConfig::fromJson(const QJsonObject &json)
     if (c.audioOut.isEmpty()) c.audioOut = c.audioIn;
     c.sampleRate = json.value(QStringLiteral("sample_rate")).toInt(c.sampleRate);
     if (c.sampleRate != 22050 && c.sampleRate != 44100 && c.sampleRate != 48000) c.sampleRate = 44100;
+#ifdef Q_OS_ANDROID
+    // A phone's audio runs at 48 kHz, and AX25Chat writes ARATE 48000 on
+    // Android: any other rate has Oboe resample the receiver's input and the
+    // transmitter's output.  Settings no longer offers the choice there, and
+    // a rate chosen with an earlier version is brought back to 48000.
+    c.sampleRate = 48000;
+#endif
     c.speed = json.value(QStringLiteral("speed")).toInt(c.speed);
     if (c.speed != 300 && c.speed != 1200 && c.speed != 9600) c.speed = 1200;
     c.ptt = json.value(QStringLiteral("ptt")).toString(c.ptt);

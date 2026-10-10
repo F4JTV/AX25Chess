@@ -104,6 +104,14 @@ private slots:
         QCOMPARE(modemconf::channelsIn(path), QList<int>{0});
     }
 
+    // TXTAIL 50 ms written by 2.0.3 as its default becomes 100 ms; a value
+    // the operator chose, or one in a file of the new schema, stays.
+    void oldTxtailDefaultIsRaised()
+    {
+        QCOMPARE(ModemConfig().txtail, 10);
+        QCOMPARE(ModemConfig::fromJson({{"txtail", 5}}).txtail, 5);   // the struct itself keeps what it is given
+    }
+
     void configurationCoercesBadValues()
     {
         QJsonObject o{{"speed", 4800}, {"ptt", "gpio"}, {"gpio", 12}, {"sample_rate", 8000}, {"audio_in", ""}};

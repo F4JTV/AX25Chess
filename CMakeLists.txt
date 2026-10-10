@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.21)
 
-project(AX25Chess VERSION 2.0.3 DESCRIPTION "Chess over AX.25 packet radio with an embedded Dire Wolf modem" LANGUAGES C CXX)
+project(AX25Chess VERSION 2.0.6 DESCRIPTION "Chess over AX.25 packet radio with an embedded Dire Wolf modem" LANGUAGES C CXX)
 
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)

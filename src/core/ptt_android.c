@@ -28,6 +28,7 @@
 #include "dlq.h"
 #include "textcolor.h"
 #include "cm108.h"
+#include "demod.h"		/* demod_mute_input, as ptt.c */
 #include "dw_embed.h"
 
 static struct audio_s *save_audio_config_p = NULL;
@@ -105,6 +106,14 @@ void ptt_set (int ot, int chan, int ptt_signal)
 	}
 	if (save_audio_config_p == NULL || save_audio_config_p->chan_medium[chan] != MEDIUM_RADIO) {
 	  return;
+	}
+
+	/* Same as ptt.c: in half duplex the receiver is muted while we
+	 * transmit.  The phone's input hears our own signal through the
+	 * interface; decoded, it holds the channel busy and shows our frames
+	 * as received. */
+	if (ot == OCTYPE_PTT && ! save_audio_config_p->achan[chan].fulldup) {
+	  demod_mute_input (chan, ptt_signal);
 	}
 
 	/* Same as ptt.c: the link layer and the host learn about our own

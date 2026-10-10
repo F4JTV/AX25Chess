@@ -62,7 +62,8 @@ QJsonObject AppConfig::toJson() const
             {QStringLiteral("channel"), radio.channel.toJson()},
             {QStringLiteral("game"), game.toJson()},
             {QStringLiteral("ui"), ui.toJson()},
-            {QStringLiteral("configured"), configured}};
+            {QStringLiteral("configured"), configured},
+            {QStringLiteral("schema"), 2}};
 }
 
 AppConfig AppConfig::fromJson(const QJsonObject &json)
@@ -74,6 +75,12 @@ AppConfig AppConfig::fromJson(const QJsonObject &json)
     c.game = GameConfig::fromJson(json.value(QStringLiteral("game")).toObject());
     c.ui = UiConfig::fromJson(json.value(QStringLiteral("ui")).toObject());
     c.configured = json.value(QStringLiteral("configured")).toBool(false);
+    // Schema 1 (up to 2.0.3) wrote TXTAIL 50 ms as its default; a value
+    // still at that default is the old default, not a choice.
+    if (json.value(QStringLiteral("schema")).toInt(1) < 2 && c.radio.modem.txtail == 5) {
+        c.radio.modem.txtail = 10;
+        c.txtailRaised = true;
+    }
     return c;
 }
 
@@ -87,12 +94,7 @@ AppConfig AppConfig::load(const QString &pathIn)
     const QString path = pathIn.isEmpty() ? configPath() : pathIn;
     QFile file(path);
     if (!file.open(QIODevice::ReadOnly)) {
-        AppConfig fresh;
-#ifdef Q_OS_ANDROID
-        // Oboe resamples, and phones run their audio at 48 kHz.
-        fresh.radio.modem.sampleRate = 48000;
-#endif
-        return fresh;
+        return AppConfig();     // on Android at 48 kHz already, see ModemConfig
     }
     const QJsonDocument doc = QJsonDocument::fromJson(file.readAll());
     return fromJson(doc.object());

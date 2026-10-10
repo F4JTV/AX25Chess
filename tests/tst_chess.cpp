@@ -22,6 +22,7 @@
 #include <QRandomGenerator>
 #include <QTemporaryDir>
 #include <QtTest>
+#include <deque>
 
 using namespace chess;
 
@@ -327,6 +328,137 @@ private slots:
             disconnect(&b, nullptr, &a, nullptr);
         }
         QCOMPARE(accepts, 2);
+    }
+
+    // A move turned down without an ACK (here: out of sequence) must be
+    // handled again when repeated - it was taken for a duplicate and
+    // acknowledged without having been played.
+    void rejectedMoveIsNotAcknowledgedWhenRepeated()
+    {
+        GameSession b(QStringLiteral("N0CALL-2"), QStringLiteral("N0CALL"));
+        b.setRandomSeed(21);
+        GameSession a(QStringLiteral("N0CALL"), QStringLiteral("N0CALL-2"));
+        a.setRandomSeed(22);
+        QList<chs::Frame> fromB;
+        connect(&a, &GameSession::sendFrame, &a, [&](const chs::Frame &f) { b.feed(f.encode(), f.src, 0); });
+        connect(&b, &GameSession::sendFrame, &b, [&](const chs::Frame &f) { fromB << f; a.feed(f.encode(), f.src, 0); });
+        a.invite(0);
+        QCOMPARE(b.state(), GameSession::State::Playing);
+        // A move from the side to move, with a ply in the future: a gap.
+        GameSession *white = a.myColor() == White ? &a : &b;
+        GameSession *other = white == &a ? &b : &a;
+        chs::Frame m;
+        m.gid = white->gid(); m.src = white->myCall(); m.dst = other->myCall(); m.seq = 77; m.type = chs::MoveType;
+        Board after;
+        Move mv;
+        QVERIFY(after.findMove("WP5", squareFromName("e4"), 0, &mv));
+        after.push(mv);
+        m.payload = chs::encodeMove(after, mv, 5, chs::positionHash(after));   // ply 5: a gap
+        int acks = 0;
+        connect(other, &GameSession::sendFrame, other, [&](const chs::Frame &f) {
+            if (f.type == chs::Ack && f.payload.startsWith("77;")) acks++;
+        });
+        other->feed(m.encode(), m.src, 0);
+        other->feed(m.encode(), m.src, 0);       // repeated
+        QCOMPARE(acks, 0);
+        QCOMPARE(other->board().plyCount(), 0);
+    }
+
+    // The invited station still had a frame of the previous game waiting
+    // for an ACK: its ACPT queued behind it and never left.
+    void invitationWithAFrameOfTheOldGamePending()
+    {
+        GameSession b(QStringLiteral("N0CALL-2"), QStringLiteral("N0CALL"));
+        b.setRandomSeed(31);
+        QList<chs::Frame> sent;
+        connect(&b, &GameSession::sendFrame, &b, [&sent](const chs::Frame &f) { sent << f; });
+        b.sendChat(QStringLiteral("anyone?"), 0);          // reliable, never acknowledged
+        QVERIFY(b.pending());
+        GameSession a(QStringLiteral("N0CALL"), QStringLiteral("N0CALL-2"));
+        a.setRandomSeed(32);
+        connect(&a, &GameSession::sendFrame, &a, [&b](const chs::Frame &f) { b.feed(f.encode(), f.src, 0); });
+        a.invite(0);
+        bool accepted = false;
+        for (const chs::Frame &f : sent) accepted = accepted || (f.type == chs::Accept && f.gid == a.gid());
+        QVERIFY2(accepted, "ACPT never sent");
+    }
+
+    // Both stations invite at the same moment: they must end in one game.
+    void crossedInvitations()
+    {
+        GameSession a(QStringLiteral("N0CALL"), QStringLiteral("N0CALL-2"));
+        GameSession b(QStringLiteral("N0CALL-2"), QStringLiteral("N0CALL"));
+        a.setRandomSeed(41);
+        b.setRandomSeed(42);
+        std::deque<std::pair<GameSession *, chs::Frame>> air;
+        connect(&a, &GameSession::sendFrame, &a, [&](const chs::Frame &f) { air.emplace_back(&b, f); });
+        connect(&b, &GameSession::sendFrame, &b, [&](const chs::Frame &f) { air.emplace_back(&a, f); });
+        a.invite(0);
+        b.invite(0);                              // before either HELLO arrives
+        QVERIFY(a.gid() != b.gid());
+        double now = 0;
+        for (int i = 0; i < 400 && !(air.empty() && !a.pending() && !b.pending()); i++) {
+            while (!air.empty()) {
+                auto [to, f] = air.front();
+                air.pop_front();
+                to->feed(f.encode(), f.src, now);
+            }
+            now += 1;
+            a.tick(now);
+            b.tick(now);
+        }
+        QCOMPARE(a.state(), GameSession::State::Playing);
+        QCOMPARE(b.state(), GameSession::State::Playing);
+        QCOMPARE(a.gid(), b.gid());
+        QVERIFY(a.myColor() != b.myColor());
+    }
+
+    // A move that arrives after the game ended here is acknowledged (or the
+    // sender repeats it for ever) but not played.
+    void moveAfterTheEndIsAcknowledged()
+    {
+        GameSession a(QStringLiteral("N0CALL"), QStringLiteral("N0CALL-2"));
+        GameSession b(QStringLiteral("N0CALL-2"), QStringLiteral("N0CALL"));
+        a.setRandomSeed(51);
+        b.setRandomSeed(52);
+        bool linkUp = true;
+        connect(&a, &GameSession::sendFrame, &a, [&](const chs::Frame &f) { if (linkUp) b.feed(f.encode(), f.src, 0); });
+        connect(&b, &GameSession::sendFrame, &b, [&](const chs::Frame &f) { if (linkUp) a.feed(f.encode(), f.src, 0); });
+        a.invite(0);
+        GameSession *white = a.myColor() == White ? &a : &b;
+        GameSession *black = white == &a ? &b : &a;
+        linkUp = false;
+        black->resign(0);                         // lost on the air
+        QVERIFY(white->playLocal("WP5", squareFromName("e4"), 0, 0));
+        linkUp = true;
+        QVERIFY(white->pending());
+        white->tick(1000);                        // the move is repeated
+        QVERIFY(!white->pending());               // and acknowledged this time
+        QCOMPARE(black->board().plyCount(), 0);   // without being played
+    }
+
+    // The correspondent knows this station under another callsign: its
+    // frames are not for us, but the operator must be told, not left
+    // believing the radio decoded nothing.
+    void peerWritingToAnotherCallsignIsReported()
+    {
+        GameSession a(QStringLiteral("N0CALL"), QStringLiteral("N0CALL-2"));
+        GameSession b(QStringLiteral("N0CALL-2"), QStringLiteral("N0CALL-7"));
+        QStringList warnings;
+        connect(&a, &GameSession::logMessage, &a, [&](GameSession::Level level, const QString &text) {
+            if (level == GameSession::Level::Warn) warnings << text;
+        });
+        connect(&b, &GameSession::sendFrame, &b, [&](const chs::Frame &f) { a.feed(f.encode(), f.src, 0); });
+        b.invite(0);
+        QCOMPARE(a.state(), GameSession::State::Idle);       // not answered
+        QCOMPARE(warnings.size(), 1);
+        QVERIFY(warnings.first().contains(QStringLiteral("N0CALL-7")));
+
+        // Traffic between two other stations stays silent.
+        GameSession c(QStringLiteral("N0CALL-3"), QStringLiteral("N0CALL-4"));
+        connect(&c, &GameSession::sendFrame, &c, [&](const chs::Frame &f) { a.feed(f.encode(), f.src, 0); });
+        c.invite(0);
+        QCOMPARE(warnings.size(), 1);
     }
 
     void duplicateMoveIsAcknowledgedNotReplayed()
