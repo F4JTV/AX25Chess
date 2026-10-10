@@ -102,9 +102,8 @@ ax_build_jobs() {
 # when they are not there yet.
 ax_ensure_direwolf() {
     local src="$1"
-    if [ -f "$src/external/direwolf/src/direwolf.h" ] && grep -q tq_term "$src/external/direwolf/src/tq.h"; then
-        return 0
-    fi
+    # Run every time: it clones only when the tree is missing, and applies
+    # any patch a newer release added to a tree patched by an older one.
     step "Dire Wolf sources"
     command -v git >/dev/null 2>&1 || die "git missing: sudo apt install git"
     command -v patch >/dev/null 2>&1 || die "patch missing: sudo apt install patch"

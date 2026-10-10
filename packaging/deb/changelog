@@ -1,3 +1,57 @@
+ax25chess (2.0.6) unstable; urgency=medium
+
+  * Android, receive: frames of the other station, its ACKs among them,
+    were often lost while the desktop decoded them all. The receive chain
+    is AX25Chat's (Dire Wolf core, Oboe backend, build flags); what
+    differs from the desktop is how much audio the input keeps. A
+    low-latency Oboe input keeps a few milliseconds while Dire Wolf
+    demodulates a 43 ms block between two reads, so any pause dropped
+    audio and cost frames their CRC. The input is now opened on Android's
+    normal path with a second of buffer; the modem log gives each stream's
+    mode and buffer and reports input overruns.
+  * Android: the sample rate is fixed at 48000 Hz, as AX25Chat does: the
+    phone's audio runs at that rate and any other one had Oboe resample the
+    input and the output. Settings no longer offers the choice on Android; a
+    rate chosen with an earlier version is brought back to 48000.
+  * A frame from the correspondent addressed to another callsign was dropped
+    in silence, which looked like a frame the radio never decoded; the Frames
+    log now says so and asks to check the callsigns.
+
+ -- AX25Chess Community <noreply@ax25chess.invalid>  Sat, 10 Oct 2026 07:48:55 +0200
+
+ax25chess (2.0.5) unstable; urgency=medium
+
+  * Android: frames sent from the phone lost their end, the FCS and the
+    closing flag, so the other station could not decode them - the ACKs among
+    them, and an invitation was never answered. The phone plays its sound a
+    whole output latency after it is written (40 to over 100 ms) and the PTT
+    was released as soon as the buffer had been handed over. audio_wait() now
+    waits for Oboe's latency estimate (calculateLatencyMillis), or the
+    buffer's duration plus 60 ms without one.
+  * TXTAIL defaults to 100 ms, Dire Wolf's own default, instead of 50; a
+    configuration written by 2.0.3 or older and still at 50 ms is raised
+    once, and the Frames log says so.
+  * Android: the receiver is muted while transmitting in half duplex, as Dire
+    Wolf's ptt.c does; the phone used to decode its own frames.
+  * CHS-1, receive side: a reliable frame counts as received only once
+    acknowledged (a rejected move that was repeated got an ACK without being
+    played); a move arriving after the end of the game is acknowledged, not
+    played; a HELLO drops the previous game's frames, which held the ACPT
+    back for ever; crossed invitations end in one game, the one with the
+    smaller id. docs/PROTOCOL.md describes them.
+  * Windows: the program died as soon as the modem started with PTT CM108 and
+    no device path. Dire Wolf's CM108 inventory passed hidapi's product
+    string to wcstombs() without checking it, and hidapi leaves it NULL for
+    devices whose string Windows refuses; the Microsoft C runtime ends the
+    process on a NULL source.
+    patches/direwolf/0002-cm108-null-product-string.patch checks it. The
+    build scripts now apply, on every run, any patch an existing Dire Wolf
+    tree lacks.
+  * The modem's console is also written to the program's console (logcat on
+    Android), so its last lines survive a crash.
+
+ -- AX25Chess Community <noreply@ax25chess.invalid>  Thu, 08 Oct 2026 04:59:35 +0000
+
 ax25chess (2.0.3) unstable; urgency=medium
 
   * Phone: controls of Settings stuck out past the right edge in portrait. In

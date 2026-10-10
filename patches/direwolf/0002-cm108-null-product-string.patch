@@ -1,0 +1,18 @@
+--- a/src/cm108.c
++++ b/src/cm108.c
+@@ -568,7 +568,14 @@
+ 	  if (num_things < max_things && cur_dev->vendor_id != 0x051d) {		// FIXME - remove exception
+ 	    things[num_things].vid = cur_dev->vendor_id;
+ 	    things[num_things].pid = cur_dev->product_id;
+-	    wcstombs (things[num_things].product, cur_dev->product_string, sizeof(things[num_things].product));
++	    /* Embedded host: hidapi leaves product_string NULL when Windows
++	     * refuses the string (common for keyboards and system devices), and
++	     * wcstombs(dst, NULL, n) makes the Microsoft C runtime terminate the
++	     * process: the program died as soon as the modem started with
++	     * PTT CM108 and no device path, the case that takes this inventory. */
++	    if (cur_dev->product_string != NULL) {
++	      wcstombs (things[num_things].product, cur_dev->product_string, sizeof(things[num_things].product));
++	    }
+ 	    things[num_things].product[sizeof(things[num_things].product) - 1] = '\0';
+ 	    strlcpy (things[num_things].devnode_hidraw, cur_dev->path, sizeof(things[num_things].devnode_hidraw));
+ 
