@@ -37,6 +37,14 @@ if(NOT _dw_has_tq_term)
     "patches/direwolf/0001-embedded-host-shutdown.patch. "
     "Run scripts/fetch_direwolf.sh, or apply the patch by hand.")
 endif()
+# Each later patch leaves its own mark: a tree patched by an older release
+# must get the newer patches too (the build scripts apply them on their own).
+file(STRINGS "${DIREWOLF_DIR}/src/cm108.c" _dw_has_cm108_fix REGEX "product_string != NULL")
+if(NOT _dw_has_cm108_fix)
+  message(FATAL_ERROR
+    "The Dire Wolf sources in ${DIREWOLF_DIR} lack patches/direwolf/0002-cm108-null-product-string.patch.\n"
+    "Run scripts/fetch_direwolf.sh (Linux, Android) or build_all.bat (Windows): they apply what is missing.")
+endif()
 
 # Version, read from the Direwolf tree so it cannot drift from the sources.
 function(_dw_read_version var name default)

@@ -143,3 +143,28 @@ Text goes on the air in ASCII, any other character replaced by `?`.
 `tests/vectors/python_vectors.json` holds games, frames and CRCs produced
 by the Python version 1.0 (`tests/vectors/make_vectors.py`); the C++ tests
 replay them and compare byte for byte.
+
+### Receive-side behaviour added in version 2.0.5
+
+Nothing changes on the air; these rules only decide how a station answers.
+
+- **A reliable frame is remembered as received only once it is
+  acknowledged.** A frame turned down without an `ACK` (a move out of
+  sequence, a fingerprint that does not match) is handled again when it is
+  repeated. It used to be remembered on arrival, so its repetition passed
+  for a duplicate and was acknowledged without ever having been applied:
+  the sender believed its move played, the receiver had not played it.
+- **A `MOVE` that arrives after the game ended here is acknowledged, not
+  played.** The other station did not learn of the end in time (a lost
+  `RSGN`, say); without an `ACK` it would repeat the move for ever.
+- **A `HELLO` drops whatever the previous game left to send.** A move or a
+  message still waiting for its `ACK` would never get one (the peer
+  ignores another game's frames) and held the `ACPT` behind it: the
+  invitation was never answered.
+- **Crossed invitations.** When both stations invite at the same moment,
+  each would accept the other's `HELLO` and end up in a different game.
+  While its own `HELLO` is still unacknowledged, a station keeps the
+  invitation with the smaller game identifier and leaves the other `HELLO`
+  unanswered; the other station, on receiving the first `HELLO`, accepts it.
+  Once a station's `HELLO` has been acknowledged, a new `HELLO` from the
+  peer is a deliberate new invitation and is accepted.
